@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1400" viewBox="0 0 1600 1400" fill="none">
+  <defs>
+    <linearGradient id="edgeA" x1="120" y1="180" x2="1480" y2="1180" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#BBDCCB" stop-opacity="0.22"/>
+      <stop offset="0.5" stop-color="#6EA58E" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#486F83" stop-opacity="0.12"/>
+    </linearGradient>
+    <linearGradient id="edgeB" x1="1390" y1="120" x2="260" y2="1240" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#82B8A7" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#C7E4D7" stop-opacity="0.1"/>
+    </linearGradient>
+    <radialGradient id="node" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(0 0) scale(14)">
+      <stop stop-color="#E4EDE4" stop-opacity="0.68"/>
+      <stop offset="0.34" stop-color="#A8D9CB" stop-opacity="0.2"/>
+      <stop offset="1" stop-color="#5F8B72" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="soften" x="-8%" y="-8%" width="116%" height="116%" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="0.55"/>
+    </filter>
+  </defs>
+  <g filter="url(#soften)" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M150 258 C270 196 360 246 470 330 C610 438 706 356 810 238 C928 104 1078 168 1210 262 C1324 344 1412 334 1502 248" stroke="url(#edgeA)" stroke-width="1.2"/>
+    <path d="M116 612 C268 528 356 690 506 612 C650 536 708 686 842 640 C1004 584 1064 420 1218 478 C1350 528 1410 700 1514 640" stroke="url(#edgeB)" stroke-width="1"/>
+    <path d="M220 1026 C350 930 490 994 606 1100 C760 1242 902 1090 1046 1014 C1184 942 1302 1074 1442 984" stroke="url(#edgeA)" stroke-width="1.05"/>
+    <path d="M308 164 C358 352 244 486 360 654 C454 790 342 982 470 1218" stroke="url(#edgeB)" stroke-width="0.86"/>
+    <path d="M740 142 C662 342 790 474 734 634 C676 800 814 948 762 1248" stroke="url(#edgeA)" stroke-width="0.82"/>
+    <path d="M1198 142 C1106 314 1252 466 1176 618 C1078 814 1284 970 1212 1268" stroke="url(#edgeB)" stroke-width="0.82"/>
+    <path d="M150 258 C240 420 260 540 360 654 C460 768 490 900 606 1100" stroke="url(#edgeA)" stroke-width="0.72" stroke-opacity="0.76"/>
+    <path d="M470 330 C508 492 570 548 734 634 C846 692 962 746 1046 1014" stroke="url(#edgeB)" stroke-width="0.72" stroke-opacity="0.7"/>
+    <path d="M810 238 C910 390 1038 374 1176 618 C1242 734 1330 858 1442 984" stroke="url(#edgeA)" stroke-width="0.72" stroke-opacity="0.72"/>
+    <path d="M506 612 C612 686 650 842 762 1248" stroke="url(#edgeB)" stroke-width="0.64" stroke-opacity="0.62"/>
+    <path d="M842 640 C952 762 1014 890 1212 1268" stroke="url(#edgeA)" stroke-width="0.64" stroke-opacity="0.58"/>
+    <path d="M1218 478 C1328 574 1358 754 1514 640" stroke="url(#edgeB)" stroke-width="0.62" stroke-opacity="0.58"/>
+  </g>
+  <g opacity="0.76">
+    <circle cx="150" cy="258" r="10" fill="url(#node)"/>
+    <circle cx="470" cy="330" r="9" fill="url(#node)"/>
+    <circle cx="810" cy="238" r="10" fill="url(#node)"/>
+    <circle cx="1210" cy="262" r="9" fill="url(#node)"/>
+    <circle cx="1502" cy="248" r="8" fill="url(#node)"/>
+    <circle cx="360" cy="654" r="9" fill="url(#node)"/>
+    <circle cx="506" cy="612" r="8" fill="url(#node)"/>
+    <circle cx="734" cy="634" r="9" fill="url(#node)"/>
+    <circle cx="842" cy="640" r="8" fill="url(#node)"/>
+    <circle cx="1176" cy="618" r="9" fill="url(#node)"/>
+    <circle cx="1218" cy="478" r="8" fill="url(#node)"/>
+    <circle cx="1514" cy="640" r="8" fill="url(#node)"/>
+    <circle cx="606" cy="1100" r="9" fill="url(#node)"/>
+    <circle cx="762" cy="1248" r="8" fill="url(#node)"/>
+    <circle cx="1046" cy="1014" r="9" fill="url(#node)"/>
+    <circle cx="1212" cy="1268" r="8" fill="url(#node)"/>
+    <circle cx="1442" cy="984" r="9" fill="url(#node)"/>
+  </g>
+</svg>

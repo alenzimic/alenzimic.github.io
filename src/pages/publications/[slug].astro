@@ -1,0 +1,158 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import profile from "../../lib/profile";
+import { collection } from "../../lib/content";
+
+export function getStaticPaths() {
+  const visiblePublicationEntries = collection(
+    import.meta.glob("../../content/publications/*.md", { eager: true }),
+  ).filter((entry) => entry.status !== "To be submitted");
+  const publicationLinks = visiblePublicationEntries.map((publication) => ({
+    slug: publication.slug,
+    title: publication.title,
+    journal: publication.journal,
+    date: publication.date,
+    status: publication.status,
+  }));
+
+  return visiblePublicationEntries.map((entry) => ({
+    params: { slug: entry.slug },
+    props: {
+      entry,
+      otherPublications: publicationLinks.filter(
+        (publication) => publication.slug !== entry.slug,
+      ),
+    },
+  }));
+}
+
+const { entry, otherPublications: routeOtherPublications } = Astro.props;
+const publicationLinks = collection(
+  import.meta.glob("../../content/publications/*.md", { eager: true }),
+)
+  .filter((publication) => publication.status !== "To be submitted")
+  .map((publication) => ({
+    slug: publication.slug,
+    title: publication.title,
+    journal: publication.journal,
+    date: publication.date,
+    status: publication.status,
+  }));
+const otherPublications =
+  routeOtherPublications ??
+  publicationLinks.filter((publication) => publication.slug !== entry.slug);
+const EntryContent = entry.Component;
+const readTime = entry.readingTime ?? "2 min read";
+const noteDate = entry.dateWritten ?? entry.date;
+const hasFigure = entry.status === "Published" && Boolean(entry.figureImage);
+---
+
+<BaseLayout title={`${entry.title} | ${profile.name}`} description={entry.summary ?? profile.researchFocus}>
+  <header class="site-header detail-header">
+    <a class="brand" href="/" aria-label={`${profile.name} home`}>
+      <span class="brand-mark" aria-hidden="true">AZ</span>
+      <span>{profile.name}</span>
+    </a>
+    <nav class="nav" aria-label="Publication navigation">
+      <a href="/#publications">Publications</a>
+      <a href="/#notes">Notes</a>
+      <a href="/#contact">Contact</a>
+    </nav>
+  </header>
+
+  <main class="detail-page">
+    <section class="section-shell paper-detail-hero">
+      <div class="detail-copy">
+        <p class="section-kicker">Paper notes</p>
+        <h1>{entry.title}</h1>
+        {entry.authors ? <p class="detail-authors">{entry.authors}</p> : null}
+        <div class="paper-note-meta" aria-label="Paper note metadata">
+          <span>
+            <strong>Time to read</strong>
+            {readTime}
+          </span>
+          <span>
+            <strong>Publication date</strong>
+            {entry.date}
+          </span>
+          <span>
+            <strong>Status</strong>
+            {entry.status}
+          </span>
+          <span>
+            <strong>Notes written</strong>
+            {noteDate}
+          </span>
+        </div>
+        {entry.summary ? <p class="intro detail-intro">{entry.summary}</p> : null}
+        <div class="hero-actions">
+          {entry.href ? <a class="button button-primary" href={entry.href}>Official publication page</a> : null}
+          {entry.repositoryHref ? <a class="button button-secondary" href={entry.repositoryHref}>Companion repository</a> : null}
+        </div>
+      </div>
+    </section>
+
+    <section class="section-shell detail-grid" aria-labelledby="paper-summary-title">
+      <article class="detail-prose">
+        <p class="section-kicker">Readable notes</p>
+        <h2 id="paper-summary-title">Reading guide</h2>
+        {
+          hasFigure ? (
+            <figure class="paper-note-figure">
+              <img
+                src={entry.figureImage}
+                alt={entry.figureAlt ?? entry.title}
+                loading="eager"
+                decoding="async"
+              />
+              {(entry.figureCaption || entry.figureSource) ? (
+                <figcaption>
+                  {entry.figureCaption ? <span>{entry.figureCaption}</span> : null}
+                  {entry.figureSource ? <a href={entry.figureSource}>Figure source</a> : null}
+                </figcaption>
+              ) : null}
+            </figure>
+          ) : null
+        }
+        <EntryContent />
+      </article>
+      <aside class="detail-aside" aria-label="Publication metadata">
+        <div>
+          <p class="card-meta">Description written</p>
+          <strong>{noteDate}</strong>
+        </div>
+        <div>
+          <p class="card-meta">Status</p>
+          <strong>{entry.status}</strong>
+        </div>
+        <div>
+          <p class="card-meta">Journal</p>
+          <strong>{entry.journal}</strong>
+        </div>
+        {
+          hasFigure && entry.figureSource ? (
+            <a class="card-link" href={entry.figureSource}>Open figure source</a>
+          ) : null
+        }
+      </aside>
+    </section>
+
+    <section class="section-shell paper-next" aria-labelledby="more-papers-title">
+      <div class="paper-next-heading">
+        <p class="section-kicker">More papers</p>
+        <h2 id="more-papers-title">Read another paper note</h2>
+      </div>
+      <div class="paper-next-grid">
+        {
+          otherPublications.map((publication) => (
+            <a class="paper-next-card" href={`/publications/${publication.slug}/`}>
+              <span class="card-meta">{publication.date} / {publication.status}</span>
+              <strong>{publication.title}</strong>
+              <span>{publication.journal}</span>
+            </a>
+          ))
+        }
+      </div>
+    </section>
+  </main>
+</BaseLayout>

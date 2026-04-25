@@ -1,0 +1,63 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import profile from "../../lib/profile";
+import { collection } from "../../lib/content";
+
+export function getStaticPaths() {
+  const notes = collection(import.meta.glob("../../content/notes/*.md", { eager: true }));
+
+  return notes.map((entry) => ({
+    params: { slug: entry.slug },
+    props: { entry },
+  }));
+}
+
+const { entry } = Astro.props;
+const EntryContent = entry.Component;
+---
+
+<BaseLayout title={`${entry.title} | ${profile.name}`} description={entry.summary ?? profile.researchFocus}>
+  <header class="site-header detail-header">
+    <a class="brand" href="/" aria-label={`${profile.name} home`}>
+      <span class="brand-mark" aria-hidden="true">AZ</span>
+      <span>{profile.name}</span>
+    </a>
+    <nav class="nav" aria-label="Note navigation">
+      <a href="/#notes">Notes</a>
+      <a href="/#publications">Publications</a>
+      <a href="/#contact">Contact</a>
+    </nav>
+  </header>
+
+  <main class="detail-page note-detail">
+    <section class="section-shell note-hero">
+      <p class="section-kicker">{entry.date}</p>
+      <h1>{entry.title}</h1>
+      {entry.summary ? <p class="intro detail-intro">{entry.summary}</p> : null}
+    </section>
+
+    <section class="section-shell detail-grid" aria-labelledby="note-title">
+      <article class="detail-prose">
+        <p class="section-kicker">Note</p>
+        <h2 id="note-title">Entry</h2>
+        <EntryContent />
+      </article>
+      <aside class="detail-aside" aria-label="Note metadata">
+        <div>
+          <p class="card-meta">Written</p>
+          <strong>{entry.dateWritten ?? entry.date}</strong>
+        </div>
+        {entry.tags?.length ? (
+          <div>
+            <p class="card-meta">Tags</p>
+            <ul class="tag-list">
+              {entry.tags.map((tag) => (
+                <li>{tag}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+      </aside>
+    </section>
+  </main>
+</BaseLayout>
