@@ -7,7 +7,7 @@ order: 7
 authors: "A. Zimic-Sheen and Moghe G."
 journal: "Phytochemistry Reviews"
 href: "https://link.springer.com/journal/11101"
-summary: "A first-author review on how AI can help characterize plant enzymes, connect pathways, and prioritize experimental work in plant metabolism."
+summary: "A review on how AI can help characterize plant enzymes, connect pathways, and prioritize experimental work in plant metabolism."
 dateWritten: "April 25, 2026"
 readingTime: "3 min read"
 visual: "enzymes"
