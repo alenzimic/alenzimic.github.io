@@ -162,6 +162,15 @@ h4 {
   backdrop-filter: blur(18px) saturate(0.92);
 }
 
+.site-header-nav-only {
+  justify-content: center;
+  min-height: 64px;
+}
+
+.site-header-nav-only .nav {
+  justify-content: center;
+}
+
 .brand {
   display: inline-flex;
   align-items: center;
@@ -1385,11 +1394,19 @@ a.service-card:focus-visible,
     padding: 18px 24px;
   }
 
+  .site-header-nav-only {
+    align-items: center;
+  }
+
   .nav {
     width: 100%;
     gap: 16px;
     overflow-x: auto;
     padding-bottom: 4px;
+  }
+
+  .site-header-nav-only .nav {
+    justify-content: flex-start;
   }
 
   .hero,

@@ -52,14 +52,10 @@ const contactHref = `mailto:${profile.email}?subject=${encodeURIComponent(
 ---
 
 <BaseLayout
-  title={`${profile.name} | Computational Biology`}
-  description={profile.researchFocus}
+  title={`${profile.fullName} | Computational Biology Portfolio`}
+  description={`${profile.fullName} portfolio for computational biology, plant science, bioinformatics, and environmental biotechnology. Also searched as ${profile.alternateNames.join(" or ")}.`}
 >
-  <header class="site-header">
-    <a class="brand" href="#top" aria-label={`${profile.name} home`}>
-      <span class="brand-mark" aria-hidden="true">AZ</span>
-      <span>{profile.name}</span>
-    </a>
+  <header class="site-header site-header-nav-only">
     <nav class="nav" aria-label="Primary navigation">
       <a href="#about">About</a>
       <a href="#experience">Experience</a>
@@ -77,7 +73,7 @@ const contactHref = `mailto:${profile.email}?subject=${encodeURIComponent(
     <section class="hero section-shell" aria-labelledby="hero-title">
       <div class="hero-copy">
         <p class="eyebrow">Computational biology / plant science / bioinformatics</p>
-        <h1 id="hero-title">{profile.name}</h1>
+        <h1 id="hero-title">{profile.fullName}</h1>
         <div class="hero-actions" aria-label="Primary actions">
           <a class="button button-primary" href={profile.cvUrl}>Curriculum Vitae</a>
           <a class="button button-secondary" href={contactHref}>Get in touch</a>

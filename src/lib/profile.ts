@@ -1,6 +1,8 @@
 const profile = {
-  name: "Alen Zimic",
-  fullName: "Alen Zimic Sheen",
+  name: "Alen Zimic-Sheen",
+  fullName: "Alen Zimic-Sheen",
+  alternateNames: ["Alen Zimic", "Alen Zimic Sheen"],
+  siteUrl: "https://alenben10.github.io",
   headline:
     "Computational biology, bioinformatics, and plant-microbe systems.",
   researchFocus:

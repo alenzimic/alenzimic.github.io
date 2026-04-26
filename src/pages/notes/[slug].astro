@@ -16,13 +16,10 @@ const { entry } = Astro.props;
 const EntryContent = entry.Component;
 ---
 
-<BaseLayout title={`${entry.title} | ${profile.name}`} description={entry.summary ?? profile.researchFocus}>
-  <header class="site-header detail-header">
-    <a class="brand" href="/" aria-label={`${profile.name} home`}>
-      <span class="brand-mark" aria-hidden="true">AZ</span>
-      <span>{profile.name}</span>
-    </a>
+<BaseLayout title={`${entry.title} | ${profile.fullName}`} description={entry.summary ?? profile.researchFocus}>
+  <header class="site-header site-header-nav-only detail-header">
     <nav class="nav" aria-label="Note navigation">
+      <a href="/">Home</a>
       <a href="/#notes">Notes</a>
       <a href="/#publications">Publications</a>
       <a href="/#contact">Contact</a>

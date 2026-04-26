@@ -1,5 +1,6 @@
 ---
 import "../styles/global.css";
+import profile from "../lib/profile";
 
 interface Props {
   title: string;
@@ -7,6 +8,53 @@ interface Props {
 }
 
 const { title, description } = Astro.props;
+const canonicalUrl = new URL(Astro.url.pathname, profile.siteUrl).toString();
+const imageUrl = new URL(profile.portraitImage, profile.siteUrl).toString();
+const nameKeywords = [profile.fullName, ...profile.alternateNames].join(", ");
+const structuredData = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Person",
+      "@id": `${profile.siteUrl}/#person`,
+      name: profile.fullName,
+      alternateName: profile.alternateNames,
+      url: profile.siteUrl,
+      image: imageUrl,
+      email: `mailto:${profile.email}`,
+      jobTitle: "Laboratory Technician",
+      sameAs: [profile.githubUrl, profile.linkedInUrl],
+      affiliation: [
+        {
+          "@type": "CollegeOrUniversity",
+          name: "Cornell University",
+        },
+        {
+          "@type": "Organization",
+          name: "Moghe Lab",
+        },
+      ],
+      knowsAbout: [
+        "Computational biology",
+        "Plant science",
+        "Bioinformatics",
+        "Plant-microbe interactions",
+        "Environmental biotechnology",
+      ],
+    },
+    {
+      "@type": "WebSite",
+      "@id": `${profile.siteUrl}/#website`,
+      name: `${profile.fullName} portfolio`,
+      alternateName: profile.alternateNames,
+      url: profile.siteUrl,
+      author: {
+        "@id": `${profile.siteUrl}/#person`,
+      },
+      inLanguage: "en",
+    },
+  ],
+};
 ---
 
 <!doctype html>
@@ -14,7 +62,24 @@ const { title, description } = Astro.props;
   <head>
     <meta charset="UTF-8" />
     <meta name="description" content={description} />
+    <meta name="author" content={profile.fullName} />
+    <meta
+      name="keywords"
+      content={`${nameKeywords}, computational biology, plant science, bioinformatics, Cornell University`}
+    />
+    <meta name="robots" content="index, follow" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="canonical" href={canonicalUrl} />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonicalUrl} />
+    <meta property="og:image" content={imageUrl} />
+    <meta property="og:site_name" content={`${profile.fullName} portfolio`} />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={imageUrl} />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -23,6 +88,7 @@ const { title, description } = Astro.props;
     />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <title>{title}</title>
+    <script type="application/ld+json" set:html={JSON.stringify(structuredData)}></script>
   </head>
   <body>
     <slot />
