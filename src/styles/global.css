@@ -1098,22 +1098,20 @@ a.service-card:focus-visible,
 }
 
 .contact-section {
-  padding: 54px 0;
-  border-top: 1px solid var(--line);
+  padding: 8px 0 0;
+  border-top: 0;
+}
+
+.contact-section::before {
+  display: none;
 }
 
 .contact-grid {
   display: grid;
   grid-template-columns: 1fr auto;
   align-items: center;
-  gap: 34px;
-}
-
-.contact-copy {
-  max-width: 560px;
-  margin: 14px 0 0;
-  color: var(--muted);
-  font-size: 16px;
+  gap: 28px;
+  padding: 24px 0 8px;
 }
 
 .contact-actions {
