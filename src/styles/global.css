@@ -345,6 +345,47 @@ h4 {
   background: rgba(142, 101, 88, 0.1);
 }
 
+.icon-action,
+.icon-link,
+.icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  border: 1px solid rgba(174, 203, 226, 0.2);
+  border-radius: 50%;
+  background: rgba(242, 246, 238, 0.045);
+  color: var(--sage);
+  line-height: 1;
+  transition:
+    border-color 180ms ease,
+    background-color 180ms ease,
+    color 180ms ease,
+    transform 180ms ease;
+}
+
+.icon-action {
+  pointer-events: none;
+}
+
+.icon-link:hover,
+.icon-link:focus-visible,
+.icon-button:hover,
+.icon-button:focus-visible,
+a:hover .icon-action,
+a:focus-visible .icon-action {
+  border-color: rgba(174, 203, 226, 0.36);
+  background: rgba(174, 203, 226, 0.08);
+  color: var(--cream);
+  transform: translateY(-1px);
+}
+
+.brand-svg,
+.lucide {
+  display: block;
+}
+
 .text-link,
 .card-link {
   display: inline-flex;
@@ -732,13 +773,11 @@ main > section:not(.hero):nth-of-type(odd)::before {
   line-height: 1.52;
 }
 
-.article-tile .card-link,
-.review-tile .card-link {
-  justify-self: start;
+.article-tile .icon-action,
+.review-tile .icon-action {
+  justify-self: end;
   align-self: end;
-  min-height: auto;
   margin-top: 6px;
-  font-size: 14px;
 }
 
 .review-mosaic {
@@ -876,7 +915,7 @@ main > section:not(.hero):nth-of-type(odd)::before {
 }
 
 .impact-card .card-link,
-.project-card .card-link,
+.project-card .icon-link,
 .note-card .card-link {
   align-self: start;
   margin-top: auto;
@@ -1586,6 +1625,11 @@ a.service-card:focus-visible,
   .contact-actions {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .contact-section .contact-actions {
+    align-items: center;
+    flex-direction: row;
   }
 
   .button,

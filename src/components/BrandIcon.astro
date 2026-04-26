@@ -1,0 +1,24 @@
+---
+interface Props {
+  icon: {
+    icon: [number, number, string[], string, string | string[]];
+  };
+  size?: number;
+}
+
+const { icon, size = 18 } = Astro.props;
+const [width, height, , , paths] = icon.icon;
+const pathList = Array.isArray(paths) ? paths : [paths];
+---
+
+<svg
+  class="brand-svg"
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox={`0 0 ${width} ${height}`}
+  width={size}
+  height={size}
+  aria-hidden="true"
+  focusable="false"
+>
+  {pathList.map((path) => <path d={path} fill="currentColor" />)}
+</svg>

@@ -1,5 +1,8 @@
 ---
+import { faGithub, faLinkedinIn } from "@fortawesome/free-brands-svg-icons";
+import { BookOpenText, Mail, NotebookText } from "@lucide/astro";
 import BaseLayout from "../layouts/BaseLayout.astro";
+import BrandIcon from "../components/BrandIcon.astro";
 import profile from "../lib/profile";
 import { collection, firstEntry } from "../lib/content";
 
@@ -170,6 +173,8 @@ const contactHref = `mailto:${profile.email}?subject=${encodeURIComponent(
                   <a
                     class={`article-tile ${index === 0 ? "article-tile-featured" : ""}`}
                     href={`/publications/${entry.slug}/`}
+                    aria-label={`${entry.title}. ${getPublicationLinkText(entry)}`}
+                    title={getPublicationLinkText(entry)}
                   >
                     <span class="publication-card-main">
                       <span class="publication-card-meta">{entry.date}</span>
@@ -178,7 +183,9 @@ const contactHref = `mailto:${profile.email}?subject=${encodeURIComponent(
                     </span>
                     <span class="publication-card-summary">
                       <span class="publication-summary">{entry.summary}</span>
-                      <span class="card-link">{getPublicationLinkText(entry)}</span>
+                      <span class="icon-action" aria-hidden="true">
+                        <BookOpenText size={17} stroke-width={1.8} />
+                      </span>
                     </span>
                   </a>
                 ))
@@ -197,7 +204,12 @@ const contactHref = `mailto:${profile.email}?subject=${encodeURIComponent(
             <div class="review-mosaic">
               {
                 reviewPublications.map((entry) => (
-                  <a class="review-tile" href={`/publications/${entry.slug}/`}>
+                  <a
+                    class="review-tile"
+                    href={`/publications/${entry.slug}/`}
+                    aria-label={`${entry.title}. ${getPublicationLinkText(entry)}`}
+                    title={getPublicationLinkText(entry)}
+                  >
                     <span class="publication-card-main">
                       <span class="publication-card-meta">{entry.date}</span>
                       <strong>{entry.title}</strong>
@@ -205,7 +217,9 @@ const contactHref = `mailto:${profile.email}?subject=${encodeURIComponent(
                     </span>
                     <span class="publication-card-summary">
                       <span class="publication-summary">{entry.summary}</span>
-                      <span class="card-link">{getPublicationLinkText(entry)}</span>
+                      <span class="icon-action" aria-hidden="true">
+                        <BookOpenText size={17} stroke-width={1.8} />
+                      </span>
                     </span>
                   </a>
                 ))
@@ -241,7 +255,14 @@ const contactHref = `mailto:${profile.email}?subject=${encodeURIComponent(
                   </ul>
                 ) : null}
                 {entry.href ? (
-                  <a class="card-link" href={entry.href}>Open repository</a>
+                  <a
+                    class="icon-link"
+                    href={entry.href}
+                    aria-label={`Open ${entry.title} repository`}
+                    title="Open repository"
+                  >
+                    <BrandIcon icon={faGithub} size={18} />
+                  </a>
                 ) : null}
               </article>
             );
@@ -374,11 +395,18 @@ const contactHref = `mailto:${profile.email}?subject=${encodeURIComponent(
       <div class="notes-list">
         {
           notes.map((entry) => (
-            <a class="note-row" href={`/notes/${entry.slug}/`}>
+            <a
+              class="note-row"
+              href={`/notes/${entry.slug}/`}
+              aria-label={`${entry.title}. Read note`}
+              title="Read note"
+            >
               <span class="card-meta">{entry.date}</span>
               <strong>{entry.title}</strong>
               <span>{entry.summary}</span>
-              <span class="card-link">Read note</span>
+              <span class="icon-action" aria-hidden="true">
+                <NotebookText size={17} stroke-width={1.8} />
+              </span>
             </a>
           ))
         }
@@ -392,9 +420,15 @@ const contactHref = `mailto:${profile.email}?subject=${encodeURIComponent(
           <h2 id="contact-title">Open to talk</h2>
         </div>
         <div class="contact-actions">
-          <a class="button button-primary" href={contactHref}>Send a note</a>
-          <a class="button button-secondary" href={profile.githubUrl}>GitHub</a>
-          <a class="button button-secondary" href={profile.linkedInUrl}>LinkedIn</a>
+          <a class="icon-button" href={contactHref} aria-label="Send a note" title="Send a note">
+            <Mail size={18} stroke-width={1.9} />
+          </a>
+          <a class="icon-button" href={profile.githubUrl} aria-label="Open GitHub profile" title="GitHub">
+            <BrandIcon icon={faGithub} size={18} />
+          </a>
+          <a class="icon-button" href={profile.linkedInUrl} aria-label="Open LinkedIn profile" title="LinkedIn">
+            <BrandIcon icon={faLinkedinIn} size={18} />
+          </a>
         </div>
       </div>
     </section>
