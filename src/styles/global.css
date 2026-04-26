@@ -234,6 +234,14 @@ h4 {
   text-shadow: 0 2px 20px rgba(0, 0, 0, 0.5);
 }
 
+.name-variants {
+  margin: 10px 0 0;
+  color: rgba(215, 222, 228, 0.72);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
 .hero-portrait {
   position: relative;
   z-index: 1;
