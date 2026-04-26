@@ -1,5 +1,5 @@
 ---
-title: "Research notes"
+title: "Notes"
 date: "April 2026"
 order: 1
 summary: "A quiet space for short reflections, paper notes, project updates, and ideas that are not ready to become formal pages."
