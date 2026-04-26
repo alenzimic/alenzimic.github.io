@@ -66,10 +66,10 @@ const contactHref = `mailto:${profile.email}?subject=${encodeURIComponent(
       <a href="#publications">Publications</a>
       <a href="#projects">Projects</a>
       <a href="#training">Training</a>
-      <a href="#contact">Talk</a>
       <a href="#recognition">Recognition</a>
       <a href="#service">Service</a>
       <a href="#notes">Notes</a>
+      <a href="#contact">Talk</a>
     </nav>
   </header>
 
@@ -280,20 +280,6 @@ const contactHref = `mailto:${profile.email}?subject=${encodeURIComponent(
       </div>
     </section>
 
-    <section id="contact" class="contact-section" aria-labelledby="contact-title">
-      <div class="section-shell contact-grid">
-        <div>
-          <p class="section-kicker">Contact</p>
-          <h2 id="contact-title">Open to talk</h2>
-        </div>
-        <div class="contact-actions">
-          <a class="button button-primary" href={contactHref}>Send a note</a>
-          <a class="button button-secondary" href={profile.githubUrl}>GitHub</a>
-          <a class="button button-secondary" href={profile.linkedInUrl}>LinkedIn</a>
-        </div>
-      </div>
-    </section>
-
     <section id="recognition" class="section-shell section-block" aria-labelledby="recognition-title">
       <div class="section-heading">
         <div>
@@ -400,6 +386,20 @@ const contactHref = `mailto:${profile.email}?subject=${encodeURIComponent(
             </a>
           ))
         }
+      </div>
+    </section>
+
+    <section id="contact" class="contact-section" aria-labelledby="contact-title">
+      <div class="section-shell contact-grid">
+        <div>
+          <p class="section-kicker">Contact</p>
+          <h2 id="contact-title">Open to talk</h2>
+        </div>
+        <div class="contact-actions">
+          <a class="button button-primary" href={contactHref}>Send a note</a>
+          <a class="button button-secondary" href={profile.githubUrl}>GitHub</a>
+          <a class="button button-secondary" href={profile.linkedInUrl}>LinkedIn</a>
+        </div>
       </div>
     </section>
 

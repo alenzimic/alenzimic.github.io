@@ -15,6 +15,7 @@ figureAlt: "Main figure from the PLOS ONE electrochemical sensor paper."
 figureCaption: "Main figure from the PLOS ONE article, showing the electrode preparation and sensing workflow for Pb(II) and Cu(II) detection."
 figureSource: "https://journals.plos.org/plosone/article/figure?id=10.1371/journal.pone.0320227.g001"
 visual: "sensor"
+tags: ["Electrochemical sensing", "Silver nanoparticles", "Heavy metals"]
 ---
 
 ## Summary

@@ -11,6 +11,7 @@ summary: "A practical evaluation of resin 3D printing as a lower-cost route for 
 dateWritten: "April 25, 2026"
 readingTime: "2 min read"
 visual: "microfluidics"
+tags: ["Microfluidics", "Resin 3D printing", "PDMS prototyping"]
 ---
 
 ## Summary

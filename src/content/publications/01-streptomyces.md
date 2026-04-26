@@ -15,6 +15,7 @@ figureAlt: "Main figure from the PLOS Biology Streptomyces drought-enrichment pa
 figureCaption: "Main figure from the PLOS Biology article, summarizing the field, isolate, genomic, and plant-assay workflow used to connect drought enrichment with strain-level function."
 figureSource: "https://journals.plos.org/plosbiology/article/figure?id=10.1371/journal.pbio.3003526.g001"
 visual: "roots"
+tags: ["Plant-microbe interactions", "Drought response", "Streptomyces", "Genomics"]
 ---
 
 ## Summary

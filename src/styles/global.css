@@ -576,12 +576,6 @@ main > section:not(.hero):nth-of-type(odd)::before {
   line-height: 1.4;
 }
 
-.tag-list li::before {
-  content: "#";
-  margin-right: 2px;
-  color: rgba(174, 203, 226, 0.42);
-}
-
 .publication-band,
 .contact-section {
   background: transparent;
@@ -1098,8 +1092,8 @@ a.service-card:focus-visible,
 }
 
 .contact-section {
-  padding: 8px 0 0;
-  border-top: 0;
+  padding: 18px 0 58px;
+  border-top: 1px solid rgba(174, 203, 226, 0.12);
 }
 
 .contact-section::before {
@@ -1111,7 +1105,7 @@ a.service-card:focus-visible,
   grid-template-columns: 1fr auto;
   align-items: center;
   gap: 28px;
-  padding: 24px 0 8px;
+  padding: 28px 0 0;
 }
 
 .contact-actions {
@@ -1302,6 +1296,29 @@ a.service-card:focus-visible,
   margin-top: 4px;
   color: var(--lichen);
   font-size: 16px;
+  line-height: 1.35;
+}
+
+.paper-topic-box {
+  padding-top: 2px;
+}
+
+.formal-tag-list {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.formal-tag-list li {
+  padding: 8px 10px;
+  border: 1px solid rgba(174, 203, 226, 0.13);
+  border-radius: 8px;
+  background: rgba(12, 11, 8, 0.38);
+  color: var(--lichen);
+  font-size: 13px;
+  font-weight: 700;
   line-height: 1.35;
 }
 

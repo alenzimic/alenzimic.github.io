@@ -11,6 +11,7 @@ summary: "A diagnostic optimization study evaluating a multiantigen print immuno
 dateWritten: "April 25, 2026"
 readingTime: "3 min read"
 visual: "diagnostics"
+tags: ["Diagnostics", "Neurocysticercosis", "Immunoassay"]
 ---
 
 ## Summary

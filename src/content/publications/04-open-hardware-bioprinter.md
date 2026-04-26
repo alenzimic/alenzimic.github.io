@@ -11,6 +11,7 @@ summary: "An open-hardware bioextrusion design built around a peristaltic pump a
 dateWritten: "April 25, 2026"
 readingTime: "2 min read"
 visual: "hardware"
+tags: ["Open hardware", "Bioprinting", "Bioextrusion"]
 ---
 
 ## Summary

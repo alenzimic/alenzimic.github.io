@@ -45,6 +45,7 @@ const EntryContent = entry.Component;
 const readTime = entry.readingTime ?? "2 min read";
 const noteDate = entry.dateWritten ?? entry.date;
 const hasFigure = entry.status === "Published" && Boolean(entry.figureImage);
+const paperTags = entry.tags ?? [entry.tabLabel, entry.visual].filter(Boolean);
 ---
 
 <BaseLayout title={`${entry.title} | ${profile.name}`} description={entry.summary ?? profile.researchFocus}>
@@ -129,6 +130,18 @@ const hasFigure = entry.status === "Published" && Boolean(entry.figureImage);
           <p class="card-meta">Journal</p>
           <strong>{entry.journal}</strong>
         </div>
+        {
+          paperTags.length ? (
+            <div class="paper-topic-box">
+              <p class="card-meta">Topics</p>
+              <ul class="formal-tag-list" aria-label="Paper topics">
+                {paperTags.map((tag) => (
+                  <li>{tag}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null
+        }
         {
           hasFigure && entry.figureSource ? (
             <a class="card-link" href={entry.figureSource}>Open figure source</a>

@@ -11,6 +11,7 @@ summary: "A first-author review on how AI can help characterize plant enzymes, c
 dateWritten: "April 25, 2026"
 readingTime: "3 min read"
 visual: "enzymes"
+tags: ["Plant enzymes", "AI-guided discovery", "Metabolic pathways"]
 ---
 
 ## Summary

@@ -12,6 +12,7 @@ summary: "A global-perspective review on how plant science training can adapt to
 dateWritten: "April 25, 2026"
 readingTime: "3 min read"
 visual: "ai-training"
+tags: ["Plant science training", "Generative AI", "Tool repository"]
 ---
 
 ## Summary
