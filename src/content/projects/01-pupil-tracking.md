@@ -3,7 +3,7 @@ title: "PupilTrackingDiagnosis"
 subtitle: "Computer vision for saccadic eye movement analysis"
 date: "Jun 2024"
 order: 1
-href: "https://github.com/alenben10/PupilTrackingDiagnosis"
+href: "https://github.com/alenzimic/PupilTrackingDiagnosis"
 summary: "A small computer-vision workflow for tracking eye movement responses from video and extracting interpretable motion features."
 tags: ["Computer Vision", "Python", "Biomedical Signals"]
 ---

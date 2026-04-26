@@ -1,6 +1,6 @@
 # Alen Zimic Portfolio
 
-Personal GitHub Pages site for `https://alenben10.github.io`, built with Astro.
+Personal GitHub Pages site for `https://alenzimic.github.io`, built with Astro.
 
 ## Edit Content
 
