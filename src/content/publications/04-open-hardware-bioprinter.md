@@ -24,6 +24,3 @@ This publication describes a low-cost bioextruder design for open-hardware biopr
 - The design uses open-hardware components to support reproducibility and adaptation.
 - The system is presented as a modular platform for prototyping bioextrusion workflows.
 
-## Device design
-
-The article reports the device architecture, hardware components, and bioextrusion strategy used to build the prototype.
