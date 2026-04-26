@@ -16,18 +16,18 @@ tags: ["Diagnostics", "Neurocysticercosis", "Immunoassay"]
 
 ## Summary
 
-This study evaluates a multiantigen print immunoassay for neurocysticercosis diagnosis using clinical samples from Lima, Peru. The goal was to improve how antigen signals can be combined and interpreted in a diagnostic setting where accessible, accurate testing matters.
+This study evaluates a multiantigen print immunoassay for neurocysticercosis diagnosis using clinical samples from Lima, Peru. The analysis focuses on antigen selection, diagnostic performance, and interpretation of multiantigen signal patterns.
 
 ## Key findings
 
 - A selected multiantigen MAPIA format showed strong diagnostic performance for neurocysticercosis.
 - Combining several antigen signals helped support interpretation across clinically relevant sample groups.
-- The assay format is positioned as a more accessible alternative to methods that require specialized materials or infrastructure.
+- The assay format provides an alternative to diagnostic workflows that require more specialized materials or infrastructure.
 
-## My contribution
+## Technical contribution
 
-My role connected analysis, software, validation, visualization, and writing. This paper is important in my trajectory because it brought together computation, diagnostics, and a public-health problem rooted in Peru.
+The work included analysis, software support, validation, visualization, and manuscript writing.
 
-## Clinical context
+## Study context
 
-The study is tied to a public-health problem with direct relevance in Peru. Its translational value depends on diagnostic accuracy and on whether the assay format can be used in settings where specialized infrastructure is limited.
+The study addresses diagnostic optimization for neurocysticercosis using samples from a clinical setting in Lima, with emphasis on assay accuracy and practical implementation.

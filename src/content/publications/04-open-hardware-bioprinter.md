@@ -16,14 +16,14 @@ tags: ["Open hardware", "Bioprinting", "Bioextrusion"]
 
 ## Summary
 
-This publication describes a low-cost bioextruder design for open-hardware bioprinting. The focus is not only the device itself, but the idea that biological fabrication tools can be made easier to reproduce and adapt.
+This publication describes a low-cost bioextruder design for open-hardware bioprinting based on a peristaltic pump architecture.
 
 ## Key findings
 
 - A peristaltic pump approach can support accessible bioextrusion hardware.
-- Open-hardware design choices make the system more useful for teaching, prototyping, and early-stage lab development.
-- The work highlights the importance of documentation and reproducibility in scientific instrumentation.
+- The design uses open-hardware components to support reproducibility and adaptation.
+- The system is presented as a modular platform for prototyping bioextrusion workflows.
 
-## Technical context
+## Device design
 
-The paper represents an engineering side of my background: building and evaluating tools that lower the barrier to experimental work. The same reproducibility concern also matters in computational biology, where methods need to be understandable and reusable.
+The article reports the device architecture, hardware components, and bioextrusion strategy used to build the prototype.

@@ -28,6 +28,6 @@ This study develops and tests an accessible electrode design for heavy-metal det
 - Stabilizing silver nanoparticles with Nafion supports a practical sensing surface.
 - The work emphasizes usable analytical performance with materials that can be implemented without highly specialized infrastructure.
 
-## Application context
+## Application
 
 The paper sits at the interface of environmental monitoring, materials chemistry, and practical sensing. Its focus is an accessible measurement platform for metal-ion detection.

@@ -23,12 +23,12 @@ This review asks how plant science education and research training should change
 
 - Generative AI can support plant scientists in literature work, coding, data analysis, communication, and teaching.
 - Training needs to include responsible use, evaluation, reproducibility, and awareness of limitations.
-- Access matters: AI training should not assume that every lab has the same infrastructure, funding, or institutional support.
+- Access constraints affect whether AI training resources can be adopted across labs with different infrastructure, funding, and institutional support.
 
-## My contribution
+## Technical contribution
 
-I built the companion repository of relevant AI tools for plant scientists who want to learn and apply these methods carefully: [plant-ai-training](https://github.com/moghelab/plant-ai-training).
+The review is paired with a companion repository of AI tools and learning resources for plant scientists: [plant-ai-training](https://github.com/moghelab/plant-ai-training).
 
 ## Review scope
 
-The review connects computational tools with plant-science training. It focuses on how AI methods can be used carefully while accounting for access, evaluation, and reproducibility.
+The review covers computational tools for plant-science training, with emphasis on access, evaluation, responsible use, and reproducibility.

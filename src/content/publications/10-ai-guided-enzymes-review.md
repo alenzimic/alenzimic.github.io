@@ -24,10 +24,10 @@ This first-author review focuses on how AI-guided approaches can help plant scie
 - Sequence, structure, literature, and pathway context are strongest when treated as complementary evidence rather than isolated signals.
 - Computational predictions need experimental grounding; the value is in narrowing the search space, not replacing validation.
 
-## My contribution
+## Technical contribution
 
-This is a first-author review, so it reflects a research direction I want to keep building: using computation to make plant metabolism more interpretable and experimentally actionable.
+This first-author review synthesizes AI-guided strategies for enzyme function prediction, pathway inference, and experimental prioritization in plant metabolism.
 
 ## Review scope
 
-The review connects computational biology with plant enzymes, metabolism, and AI-assisted biological discovery. Its scope is the use of computational evidence to prioritize testable hypotheses.
+The review covers computational biology, plant enzymes, metabolism, and AI-assisted biological discovery, with emphasis on using computational evidence to prioritize testable hypotheses.

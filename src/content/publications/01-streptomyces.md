@@ -28,6 +28,6 @@ This paper looks past the broad observation that Streptomyces often increases in
 - Being enriched under drought did not automatically mean that a strain improved plant growth.
 - The results support a more careful, strain-level view of plant-associated microbes instead of treating broad taxonomic labels as functional predictions.
 
-## Methods and context
+## Methods
 
 The study connects ecological patterns to genomes, phenotypes, and experimental follow-up. Its design makes the microbiome result more specific by moving from enriched taxa toward strain-level traits and plant assays.

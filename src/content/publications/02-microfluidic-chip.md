@@ -16,7 +16,7 @@ tags: ["Microfluidics", "Resin 3D printing", "PDMS prototyping"]
 
 ## Summary
 
-This paper evaluates a resin-printing workflow for making reusable microfluidic templates. The main story is practical: lower-cost fabrication can help labs prototype devices, but the workflow still needs careful measurement before it can be trusted.
+This paper evaluates a resin-printing workflow for making reusable microfluidic templates. The study compares fabrication constraints, template performance, and practical requirements for PDMS chip prototyping.
 
 ## Key findings
 
@@ -24,6 +24,6 @@ This paper evaluates a resin-printing workflow for making reusable microfluidic 
 - Channel geometry, feature size, and print behavior need to be measured rather than assumed.
 - The method is most useful when speed, cost, and iteration matter as much as perfect fabrication precision.
 
-## Methods and context
+## Methods
 
-The work connects engineering constraints with practical lab workflows. It is relevant for teams that need low-cost biological tools and can tolerate an iterative prototyping process.
+The workflow uses resin 3D printing to fabricate molds for PDMS microfluidic devices, then assesses whether the printed templates can support reproducible channel formation at lower cost.
