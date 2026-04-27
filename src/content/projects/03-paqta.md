@@ -2,7 +2,7 @@
 title: "Plant AI Training Repository"
 subtitle: "A practical AI tools guide for plant scientists"
 date: "2026"
-order: 3
+order: 4
 href: "https://github.com/moghelab/plant-ai-training"
 summary: "A companion repository for the Plant Cell review, collecting relevant AI tools and learning resources for plant scientists."
 tags: ["Plant Science", "AI Tools", "Training Resource"]
