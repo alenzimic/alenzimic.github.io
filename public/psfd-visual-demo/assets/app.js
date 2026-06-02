@@ -13,6 +13,7 @@ const state = {
   includeRejected: false,
   showSharedContext: false,
   orphanOnly: false,
+  entityScope: "paper",
   entityType: "all",
   relationClass: "all",
   normalizedOnly: false,
@@ -253,6 +254,10 @@ function installGlobalHandlers() {
     } else if (target instanceof HTMLSelectElement) {
       state[key] = target.value;
     }
+    if (key === "entityScope" || key === "entityType") {
+      state.selectedKind = null;
+      state.selectedId = null;
+    }
     state.pathResults = [];
     state.discoverResults = [];
     state.listPage = 0;
@@ -317,6 +322,11 @@ function installGlobalHandlers() {
     if (action === "find-hypotheses") runHypothesisSearch();
     if (action === "annotate-entities") runAnnotationLookup();
     if (action === "set-annotation-example") setAnnotationExample(actionTarget.getAttribute("data-example") || "");
+    if (action === "set-entity-type") {
+      state.entityType = actionTarget.getAttribute("data-value") || "all";
+      state.listPage = 0;
+      render();
+    }
     if (action === "export-hypothesis") exportHypothesisReport(Number(actionTarget.getAttribute("data-index") || 0));
     if (action === "select-global") {
       selectGlobalItem(
@@ -452,6 +462,12 @@ function buildIndexes(data) {
 
 function render() {
   if (!state.data) return;
+  if (state.tab === "entities" && state.entityScope === "all" && !state.globalPathIndex && !state.globalPathLoading) {
+    loadGlobalPathIndex().then(render).catch((error) => {
+      console.error(error);
+      state.globalPathLoading = false;
+    });
+  }
   renderPaperSummary();
   renderTabs();
   renderFilters();
@@ -528,14 +544,19 @@ function renderFilters() {
     return;
   }
   if (state.tab === "entities") {
-    const types = Array.from(new Set(state.data.entities.map((entity) => entity.entity_type || "unknown"))).sort();
+    const types = entityFilterTypes();
     els.filterPanel.innerHTML = filterDrawer("Entity Filters", `
+      <select data-state-key="entityScope">
+        <option value="paper" ${state.entityScope === "paper" ? "selected" : ""}>Current paper only</option>
+        <option value="all" ${state.entityScope === "all" ? "selected" : ""}>All papers database</option>
+      </select>
       <select data-state-key="entityType">
         <option value="all">All entity types</option>
         ${types.map((item) => `<option value="${esc(item)}" ${state.entityType === item ? "selected" : ""}>${esc(clean(item))}</option>`).join("")}
       </select>
       ${check("normalizedOnly", "Only ontology-normalized entities")}
-    `);
+      ${state.entityScope === "all" ? `<div class="filter-note">${state.globalPathIndex ? `${fmt(state.globalPathIndex.entities.length)} entities across ${fmt(uniqueStrings(state.globalPathIndex.entities.map((entity) => entity.pmcid)).length)} papers.` : "Loading all-paper entity index..."}</div>` : ""}
+    `, true);
     return;
   }
   els.filterPanel.innerHTML = filterDrawer("Path Search Options", `
@@ -549,9 +570,9 @@ function renderFilters() {
   `);
 }
 
-function filterDrawer(title, content) {
+function filterDrawer(title, content, open = false) {
   return `
-    <details class="filter-drawer">
+    <details class="filter-drawer" ${open ? "open" : ""}>
       <summary>
         <span>${esc(title)}</span>
         <span class="drawer-hint">Options</span>
@@ -568,6 +589,13 @@ function check(key, label) {
       ${esc(label)}
     </label>
   `;
+}
+
+function entityFilterTypes() {
+  if (state.entityScope === "all" && state.globalPathIndex) {
+    return Array.from(new Set(state.globalPathIndex.entities.map((entity) => entity.type || "unknown"))).sort();
+  }
+  return Array.from(new Set(state.data.entities.map((entity) => entity.entity_type || "unknown"))).sort();
 }
 
 function visibleItems() {
@@ -621,6 +649,7 @@ function visibleRelations() {
 }
 
 function visibleEntities() {
+  if (state.entityScope === "all") return visibleGlobalEntities();
   return state.data.entities
     .filter((entity) => state.entityType === "all" || entity.entity_type === state.entityType)
     .filter((entity) => !state.normalizedOnly || entity.selected_ontology_id || geneProteinOntologyIds(entity).length)
@@ -630,6 +659,54 @@ function visibleEntities() {
       if (compoundRank) return compoundRank;
       return entityName(a).localeCompare(entityName(b));
     });
+}
+
+function visibleGlobalEntities() {
+  if (!state.globalPathIndex) return [];
+  return state.globalPathIndex.entities
+    .map(globalEntityToBrowseEntity)
+    .filter((entity) => state.entityType === "all" || entity.entity_type === state.entityType)
+    .filter((entity) => !state.normalizedOnly || entity.selected_ontology_id || geneProteinOntologyIds(entity).length)
+    .filter((entity) => queryMatches(globalBrowseEntitySearchText(entity)))
+    .sort((a, b) => {
+      const compoundRank = (b.entity_type === "compound") - (a.entity_type === "compound");
+      if (compoundRank) return compoundRank;
+      const evidenceRank = Number(b.relation_count || 0) + Number(b.event_count || 0) - Number(a.relation_count || 0) - Number(a.event_count || 0);
+      if (evidenceRank) return evidenceRank;
+      return entityName(a).localeCompare(entityName(b)) || String(a.pmcid).localeCompare(String(b.pmcid));
+    });
+}
+
+function globalEntityToBrowseEntity(entity) {
+  return {
+    _globalEntity: true,
+    node_id: entity.id,
+    id: entity.id,
+    pmcid: entity.pmcid,
+    paper_title: entity.paper_title,
+    canonical_form: pathEntityName(entity),
+    normalized_label: entity.normalized_label || "",
+    entity_type: entity.type || "unknown",
+    selected_ontology: entity.ontology || "",
+    selected_ontology_id: entity.ontology_id || "",
+    selected_label: entity.selected_label || "",
+    selected_description: entity.selected_description || "",
+    decision: entity.decision || "",
+    relation_count: entity.relation_count || 0,
+    event_count: entity.event_count || 0,
+    compound_classification: entity.compound_classification || {},
+    gene_protein_normalization: entity.gene_protein_normalization || {},
+    ontology_ids: entity.ontology_ids || []
+  };
+}
+
+function globalBrowseEntitySearchText(entity) {
+  return [
+    entitySearchText(entity),
+    entity.pmcid,
+    entity.paper_title,
+    asArray(entity.ontology_ids).join(" ")
+  ].join(" ");
 }
 
 function dependencyText(dep) {
@@ -691,6 +768,7 @@ function relationText(rel) {
 function ensureSelection(items) {
   if (state.tab === "discover") return;
   if (state.tab === "paths") return;
+  if (state.tab === "entities" && state.entityScope === "all" && !selectedExists()) return;
   if (selectedExists()) return;
   const first = items[0];
   if (!first) {
@@ -755,6 +833,11 @@ function renderList(items) {
     `;
     return;
   }
+  if (state.tab === "entities" && state.entityScope === "all" && state.globalPathLoading && !state.globalPathIndex) {
+    els.listCount.textContent = "loading";
+    els.resultList.innerHTML = `<div class="compact-card muted">Loading all-paper entity index...</div>`;
+    return;
+  }
   els.listCount.textContent = `${fmt(items.length)} shown`;
   if (!items.length) {
     els.resultList.innerHTML = `<div class="compact-card muted">No items match the current filters.</div>`;
@@ -781,11 +864,12 @@ function signalBrowser(items, pageItems, start, end, totalPages) {
 function signalToolbar(items, start, end, totalPages) {
   const selectedIndex = selectedIndexIn(items);
   const selectedText = selectedIndex >= 0 ? `selected ${fmt(selectedIndex + 1)}` : "select a card";
+  const label = state.tab === "entities" && state.entityScope === "all" ? "all-paper entities" : clean(state.tab);
   return `
     <div class="signal-toolbar">
       <div>
         <span class="signal-eyebrow">Explore</span>
-        <strong>${esc(clean(state.tab))}</strong>
+        <strong>${esc(label)}</strong>
         <span>${fmt(items.length)} records | ${fmt(start + 1)}-${fmt(end)} shown | ${esc(selectedText)}</span>
       </div>
       <div class="signal-pager">
@@ -815,7 +899,7 @@ function signalCard(item, absoluteIndex) {
   const selected = selectedRowId() === id;
   const color = signalColor(item);
   return `
-    <button class="signal-card ${selected ? "selected" : ""}" type="button" role="listitem" data-action="${esc(signalAction())}" data-id="${esc(id)}" style="--signal-color:${esc(color)}">
+    <button class="signal-card ${selected ? "selected" : ""}" type="button" role="listitem" ${signalActionAttrs(item, id)} style="--signal-color:${esc(color)}">
       <span class="signal-accent" aria-hidden="true"></span>
       <span class="signal-body">
         <span class="signal-topline">
@@ -842,6 +926,17 @@ function signalAction() {
   return "";
 }
 
+function signalActionAttrs(item, id) {
+  if (isGlobalEntityBrowseItem(item)) {
+    return `data-action="select-global" data-kind="entity" data-id="${esc(id)}" data-pmcid="${esc(item.pmcid || "")}"`;
+  }
+  return `data-action="${esc(signalAction())}" data-id="${esc(id)}"`;
+}
+
+function isGlobalEntityBrowseItem(item) {
+  return state.tab === "entities" && state.entityScope === "all" && Boolean(item?._globalEntity);
+}
+
 function signalColor(item) {
   if (state.tab === "dependencies") return colorForDependency(item.dependency_type);
   if (state.tab === "events") return colorForEvent(item.event_type);
@@ -854,7 +949,7 @@ function signalKicker(item) {
   if (state.tab === "dependencies") return `${clean(item.tier || "candidate")} dependency`;
   if (state.tab === "events") return clean(item.event_scope || "event");
   if (state.tab === "relations") return `${clean(item.predicate_class || "relation")} relation`;
-  if (state.tab === "entities") return clean(item.entity_type || "entity");
+  if (state.tab === "entities") return isGlobalEntityBrowseItem(item) ? `${clean(item.entity_type || "entity")} | ${item.pmcid}` : clean(item.entity_type || "entity");
   return "";
 }
 
@@ -890,7 +985,8 @@ function signalPillValues(item) {
     return [
       item.selected_ontology_id || geneProteinOntologyIds(item).length ? "normalized" : clean(item.decision || "unreviewed"),
       item.gene_protein_normalization?.fasta_accessions?.length ? "FASTA" : "",
-      item.event_count ? `${fmt(item.event_count)} events` : ""
+      item.event_count ? `${fmt(item.event_count)} events` : "",
+      isGlobalEntityBrowseItem(item) ? item.pmcid : ""
     ];
   }
   return [];
@@ -910,7 +1006,12 @@ function signalContextLine(item) {
   if (state.tab === "dependencies") return dependencyTransition(item);
   if (state.tab === "events") return eventParticipantPreview(item, 3) || clean(item.event_scope);
   if (state.tab === "relations") return relationEndpointPreview(item);
-  if (state.tab === "entities") return entityMetadataPreview(item);
+  if (state.tab === "entities") {
+    if (isGlobalEntityBrowseItem(item)) {
+      return shortText([item.paper_title, entityMetadataPreview(item)].filter(Boolean).join(" | "), 80);
+    }
+    return entityMetadataPreview(item);
+  }
   return "";
 }
 
@@ -994,6 +1095,10 @@ function renderMain() {
     renderPathExplorer();
     return;
   }
+  if (state.tab === "entities" && state.entityScope === "all" && !selectedExists()) {
+    renderGlobalEntityOverview();
+    return;
+  }
   if (!state.selectedKind) {
     els.mainPanel.innerHTML = `<div class="empty-state"><div><strong>No selection</strong><span>Select an item from the left panel.</span></div></div>`;
     return;
@@ -1002,6 +1107,57 @@ function renderMain() {
   if (state.selectedKind === "event") renderEventMain(state.indexes.eventById.get(state.selectedId));
   if (state.selectedKind === "relation") renderRelationMain(state.indexes.relationById.get(state.selectedId));
   if (state.selectedKind === "entity") renderEntityMain(state.indexes.entityById.get(state.selectedId));
+}
+
+function renderGlobalEntityOverview() {
+  const loaded = Boolean(state.globalPathIndex);
+  const matches = loaded ? visibleGlobalEntities() : [];
+  const types = loaded ? summarizeGlobalEntityTypes(matches) : [];
+  const paperCount = loaded ? uniqueStrings(state.globalPathIndex.entities.map((entity) => entity.pmcid)).length : 0;
+  els.mainPanel.innerHTML = `
+    <section class="hero-card global-entity-overview">
+      <div class="hero-title">
+        <div>
+          <h2>All-Paper Entity Browser</h2>
+          <p>Search genes, compounds, traits, conditions, and ontology IDs across the full PSFD demo database.</p>
+        </div>
+        <div>${badges(loaded ? [`${fmt(matches.length)} matches`, `${fmt(paperCount)} papers`] : ["loading global index"])}</div>
+      </div>
+      ${loaded ? `
+        <div class="global-entity-metrics">
+          ${stat(state.globalPathIndex.entities.length, "total entities")}
+          ${stat(state.globalPathIndex.stats?.concepts || state.globalPathIndex.concepts?.length || 0, "normalized concepts")}
+          ${stat(matches.length, "current matches")}
+          ${stat(paperCount, "papers")}
+        </div>
+        <div class="global-category-grid">
+          ${types.map((item) => `
+            <button class="global-category-card ${state.entityType === item.type ? "selected" : ""}" type="button" data-action="set-entity-type" data-value="${esc(item.type)}" style="--entity-color:${colorForEntity(item.type)}">
+              <span class="dot"></span>
+              <strong>${esc(clean(item.type))}</strong>
+              <span>${fmt(item.count)} entities</span>
+            </button>
+          `).join("")}
+        </div>
+        <div class="compact-card">
+          <strong>How to use this view</strong>
+          <span class="muted">Use the top search box for any alias, gene ID, compound, ontology ID, or paper-specific term. Use the entity-type filter to browse a category across all papers. Click a result to open the exact paper and entity record.</span>
+        </div>
+      ` : `<div class="empty-state"><strong>Loading all-paper data</strong><span>Fetching the global entity and path index.</span></div>`}
+    </section>
+  `;
+}
+
+function summarizeGlobalEntityTypes(entities) {
+  const counts = new Map();
+  entities.forEach((entity) => {
+    const type = entity.entity_type || "unknown";
+    counts.set(type, (counts.get(type) || 0) + 1);
+  });
+  return Array.from(counts.entries())
+    .map(([type, count]) => ({ type, count }))
+    .sort((a, b) => b.count - a.count || a.type.localeCompare(b.type))
+    .slice(0, 12);
 }
 
 function renderDependencyMain(dep) {
