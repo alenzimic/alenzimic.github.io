@@ -1628,9 +1628,27 @@ function focusedRelationForEvent(relations) {
 }
 
 function relationContextEntities(rel) {
+  const evidence = relationEvidenceSentence(rel).text;
+  return asArray(rel?.context_node_ids)
+    .map((id) => state.indexes.entityById.get(id))
+    .filter(Boolean)
+    .filter((entity) => relationContextMatchesEvidence(entity, evidence));
+}
+
+function rawRelationContextEntities(rel) {
   return asArray(rel?.context_node_ids)
     .map((id) => state.indexes.entityById.get(id))
     .filter(Boolean);
+}
+
+function relationContextMatchesEvidence(entity, evidenceText) {
+  const evidence = String(evidenceText || "").trim();
+  if (!entity || !evidence) return false;
+  return entityHighlightLabels(entity).some((label) => {
+    const pattern = relationTermPattern(label);
+    if (!pattern) return false;
+    return new RegExp(pattern, "i").test(evidence);
+  });
 }
 
 function relationContextRow(rel, options = {}) {
@@ -1703,6 +1721,7 @@ function eventRelationContextPanel(event, relations, options = {}) {
 
 function relationContextFocusContent(rel, options = {}) {
   const contexts = relationContextEntities(rel);
+  const rawContexts = rawRelationContextEntities(rel);
   const sentence = relationEvidenceSentence(rel);
   const compact = Boolean(options.compact);
   if (compact) {
@@ -1715,8 +1734,8 @@ function relationContextFocusContent(rel, options = {}) {
         <button class="mini-button ghost-open" type="button" data-action="select-relation" data-id="${esc(rel.record_id)}">Details</button>
       </div>
       <div class="relation-context-assignment focus compact">
-        <span class="assignment-label">Context for this relation</span>
-        ${contexts.length ? contexts.map(relationContextEntityChip).join("") : `<span class="muted tiny">No context entities were assigned to this relation.</span>`}
+        <span class="assignment-label">Sentence-local context</span>
+        ${contexts.length ? contexts.map(relationContextEntityChip).join("") : `<span class="muted tiny">${rawContexts.length ? "Broader event context exists, but none matched this relation sentence." : "No context entities were assigned to this relation."}</span>`}
       </div>
       <div class="highlighted-sentence compact">
         ${sentence.text ? highlightRelationSentence(sentence.text, rel, contexts) : `<span class="muted">No core evidence sentence is available for this relation.</span>`}
@@ -1767,9 +1786,10 @@ function updateRelationContextFocus(relationId, eventId = "") {
 function relationEvidenceSentence(rel) {
   const id = asArray(rel.evidence_sentence_ids)[0] || "";
   const sentence = id ? state.indexes.sentenceById.get(id) : null;
+  const rawEvidence = asArray(rel.evidence).map((item) => item?.text || "").filter(Boolean).join(" ");
   return {
     id,
-    text: sentence?.text || rel.evidence_preview || ""
+    text: rel.evidence_preview || rawEvidence || sentence?.text || ""
   };
 }
 
@@ -2175,6 +2195,9 @@ function renderRelationMain(rel) {
 
 function relationEvidence(rel) {
   const sentences = rel.evidence_sentence_ids || [];
+  const localContexts = relationContextEntities(rel);
+  const rawContexts = rawRelationContextEntities(rel);
+  const evidence = relationEvidenceSentence(rel);
   return `
     <div class="two-col">
       <div class="kv">
@@ -2182,11 +2205,12 @@ function relationEvidence(rel) {
         <div class="key">Passage</div><div>${esc(rel.current_passage_id || "-")}</div>
         <div class="key">Context source</div><div>${esc(rel.context_enrichment_source || "-")}</div>
         <div class="key">Context enriched</div><div>${esc(String(rel.context_enriched))}</div>
-        <div class="key">Context</div><div>${esc(JSON.stringify(rel.context || {}))}</div>
+        <div class="key">Sentence-local context</div><div>${localContexts.length ? localContexts.map(relationContextEntityChip).join("") : `<span class="muted">No context matched the relation evidence sentence.</span>`}</div>
+        <div class="key">Broader extracted context</div><div>${rawContexts.length ? rawContexts.map(relationContextEntityChip).join("") : `<span class="muted">-</span>`}</div>
       </div>
       <div class="evidence-block">
-        <strong>Evidence Sentences</strong>
-        ${sentences.length ? sentences.map((id) => `<p>${esc(sentenceText(id))}</p>`).join("") : `<span class="muted">No evidence sentence IDs.</span>`}
+        <strong>Evidence Sentence</strong>
+        ${evidence.text ? `<p>${highlightRelationSentence(evidence.text, rel, localContexts)}</p>` : sentences.length ? sentences.map((id) => `<p>${esc(sentenceText(id))}</p>`).join("") : `<span class="muted">No evidence sentence IDs.</span>`}
         ${rel.evidence_context_text ? `<details><summary>Neighboring context</summary><p>${esc(rel.evidence_context_text)}</p></details>` : ""}
       </div>
     </div>
