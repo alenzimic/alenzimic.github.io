@@ -862,9 +862,9 @@ textarea {
 .mechanism-event-card {
   min-width: 0;
   display: grid;
-  gap: 10px;
+  gap: 9px;
   align-content: start;
-  padding: 14px;
+  padding: 12px;
   border: 1px solid var(--line);
   border-top: 5px solid var(--event-color);
   border-radius: 8px;
@@ -889,7 +889,7 @@ textarea {
 .mechanism-event-card h3 {
   margin: 0;
   color: #17211f;
-  font-size: 17px;
+  font-size: 16px;
   line-height: 1.22;
 }
 
@@ -899,20 +899,69 @@ textarea {
   gap: 3px;
 }
 
+.mechanism-section {
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+  padding: 8px;
+  border: 1px solid #dce6e1;
+  border-radius: 8px;
+  background: #fbfcfb;
+}
+
+.mechanism-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  padding-bottom: 5px;
+  border-bottom: 1px solid #e5ece8;
+}
+
+.mechanism-section-head strong {
+  color: #21332d;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1.15;
+  text-transform: uppercase;
+}
+
+.mechanism-section-head span {
+  min-width: 0;
+  overflow: hidden;
+  color: #7a8883;
+  font-size: 10px;
+  font-weight: 750;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.triples-section {
+  background: #f8fbfa;
+}
+
+.provenance-section {
+  border-color: #cddfd8;
+  background:
+    linear-gradient(180deg, rgba(240, 248, 245, 0.92), rgba(255, 255, 255, 0.96));
+}
+
 .mechanism-entity-strip {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
-  gap: 7px;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: 6px;
 }
 
 .participant-groups {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .participant-group {
   display: grid;
-  gap: 7px;
+  gap: 6px;
 }
 
 .participant-group-head {
@@ -940,12 +989,12 @@ textarea {
 
 .mini-entity-chip {
   min-width: 0;
-  min-height: 42px;
+  min-height: 38px;
   display: grid;
-  grid-template-columns: 13px minmax(0, 1fr);
+  grid-template-columns: 11px minmax(0, 1fr);
   align-items: center;
-  gap: 7px;
-  padding: 7px;
+  gap: 6px;
+  padding: 6px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fcfdfc;
@@ -968,8 +1017,8 @@ textarea {
 }
 
 .mini-entity-chip .dot {
-  width: 13px;
-  height: 13px;
+  width: 11px;
+  height: 11px;
   border-color: rgba(0, 0, 0, 0.16);
   background: var(--entity-color);
 }
@@ -987,14 +1036,14 @@ textarea {
 
 .mini-entity-chip strong {
   color: #20312b;
-  font-size: 12px;
+  font-size: 11.5px;
   line-height: 1.2;
 }
 
 .mini-entity-chip small {
   margin-top: 2px;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 9.8px;
 }
 
 .participant-more {
@@ -1181,6 +1230,10 @@ textarea {
   gap: 7px;
 }
 
+.mechanism-relation-stack.compact-stack {
+  gap: 5px;
+}
+
 .mini-relation {
   width: 100%;
   min-height: 34px;
@@ -1226,13 +1279,16 @@ textarea {
 
 .relation-context-row.compact {
   grid-template-columns: 1fr;
-  gap: 7px;
+  gap: 4px;
+  padding: 5px;
+  border-color: #d9e4df;
+  background: #fff;
 }
 
 .relation-context-row.active {
-  border-color: #8db9ad;
-  background: #f5fbf8;
-  box-shadow: inset 3px 0 0 var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 55%, #d9e4df);
+  background: color-mix(in srgb, var(--accent) 6%, white);
+  box-shadow: inset 4px 0 0 var(--accent);
 }
 
 .relation-context-row:hover {
@@ -1256,6 +1312,12 @@ textarea {
   text-align: center;
 }
 
+.relation-context-main.compact-main {
+  min-height: 30px;
+  padding: 4px 6px;
+  grid-template-columns: minmax(0, 1fr) minmax(86px, 0.75fr) minmax(0, 1fr);
+}
+
 .relation-context-main span,
 .relation-context-main strong {
   min-width: 0;
@@ -1267,6 +1329,13 @@ textarea {
   font-size: 11px;
 }
 
+.relation-context-main.compact-main span {
+  overflow: hidden;
+  font-size: 10.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .relation-context-main strong {
   padding: 4px 8px;
   border-radius: 999px;
@@ -1274,6 +1343,60 @@ textarea {
   color: var(--accent-dark);
   font-size: 10px;
   text-transform: lowercase;
+}
+
+.relation-context-main.compact-main strong {
+  padding: 3px 6px;
+  overflow: hidden;
+  font-size: 9.8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compact-relation-meta {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.compact-context-strip {
+  min-width: 0;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 4px;
+  align-items: center;
+  overflow: hidden;
+}
+
+.compact-context-strip .context-assignment-chip {
+  max-width: 118px;
+  min-height: 20px;
+  padding: 2px 6px;
+  overflow: hidden;
+  font-size: 9.8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compact-context-strip .context-assignment-chip .dot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+}
+
+.compact-count {
+  flex: 0 0 auto;
+  padding: 2px 6px;
+  font-size: 9.5px;
+}
+
+.ghost-open {
+  min-height: 24px;
+  padding: 2px 7px;
+  color: #43564f;
+  font-size: 10.5px;
 }
 
 .relation-context-assignment {
@@ -1293,6 +1416,11 @@ textarea {
   border: 1px dashed #c9d9d3;
   border-radius: 8px;
   background: #fbfdfc;
+}
+
+.relation-context-assignment.focus.compact {
+  padding: 5px;
+  background: #f7fbf9;
 }
 
 .assignment-label {
@@ -1343,7 +1471,13 @@ textarea {
 }
 
 .relation-context-focus.compact {
+  gap: 6px;
+  margin-top: 0;
   padding: 8px;
+  border-color: #bed6ce;
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f6fbf8 100%);
+  box-shadow: inset 4px 0 0 var(--accent);
 }
 
 .relation-context-focus-head {
@@ -1381,6 +1515,11 @@ textarea {
   text-align: center;
 }
 
+.selected-triple-line.compact {
+  padding: 5px 6px;
+  background: #fff;
+}
+
 .selected-triple-line span,
 .selected-triple-line strong {
   min-width: 0;
@@ -1409,6 +1548,16 @@ textarea {
   font-size: 12px;
   line-height: 1.5;
   overflow-wrap: anywhere;
+}
+
+.highlighted-sentence.compact {
+  max-height: 116px;
+  overflow: auto;
+  padding: 8px;
+  border-color: #cddfd8;
+  background: #fff;
+  font-size: 11.5px;
+  line-height: 1.45;
 }
 
 .highlighted-sentence mark {
@@ -1572,6 +1721,24 @@ textarea {
   color: #344640;
   font-size: 12px;
   text-transform: uppercase;
+}
+
+.event-section-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.event-section-title span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .mechanism-map-wrap {

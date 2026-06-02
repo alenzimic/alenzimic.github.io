@@ -1330,11 +1330,29 @@ function eventMechanismPanel(event, role) {
       <div class="mechanism-meta">
         ${badges([clean(event.event_type), `${event.relation_count} relations`, `${event.dependency_counts.accepted} deps`])}
       </div>
-      ${participantGroupsMarkup(event, { directLimit: 6, contextLimit: 6, otherLimit: 3 })}
-      <div class="mechanism-relation-stack">
-        ${relations.map((rel) => relationContextRow(rel, { compact: true, eventId: event.event_id, activeId: focused?.record_id || "" })).join("") || `<div class="mini-relation muted">No relations.</div>`}
+      <div class="mechanism-section participants-section">
+        <div class="mechanism-section-head">
+          <strong>Entities</strong>
+          <span>relation endpoints and context</span>
+        </div>
+        ${participantGroupsMarkup(event, { directLimit: 5, contextLimit: 4, otherLimit: 2 })}
       </div>
-      ${eventRelationContextPanel(event, relations, { compact: true })}
+      <div class="mechanism-section triples-section">
+        <div class="mechanism-section-head">
+          <strong>Triples</strong>
+          <span>select a row to update provenance</span>
+        </div>
+        <div class="mechanism-relation-stack compact-stack">
+          ${relations.map((rel) => relationContextRow(rel, { compact: true, eventId: event.event_id, activeId: focused?.record_id || "" })).join("") || `<div class="mini-relation muted">No relations.</div>`}
+        </div>
+      </div>
+      <div class="mechanism-section provenance-section">
+        <div class="mechanism-section-head">
+          <strong>Provenance</strong>
+          <span>selected triple evidence</span>
+        </div>
+        ${eventRelationContextPanel(event, relations, { compact: true })}
+      </div>
     </article>
   `;
 }
@@ -1599,6 +1617,25 @@ function relationContextRow(rel, options = {}) {
   const active = rel.record_id === (options.activeId || state.focusedRelationId);
   const visibleContexts = contexts.slice(0, options.compact ? 4 : 8);
   const eventId = options.eventId || asArray(rel.event_ids)[0] || "";
+  if (options.compact) {
+    const compactContexts = contexts.slice(0, 3);
+    return `
+      <article class="relation-context-row compact ${active ? "active" : ""}" data-relation-context-id="${esc(rel.record_id)}" data-relation-event-id="${esc(eventId)}">
+        <button class="relation-context-main compact-main" type="button" data-action="focus-relation-context" data-id="${esc(rel.record_id)}">
+          <span>${esc(shortText(subjectLabel, 26))}</span>
+          <strong>${esc(shortText(clean(rel.predicate || rel.predicate_class || "relates to"), 28))}</strong>
+          <span>${esc(shortText(objectLabel, 26))}</span>
+        </button>
+        <div class="compact-relation-meta">
+          <div class="compact-context-strip">
+            ${compactContexts.length ? compactContexts.map(relationContextEntityChip).join("") : `<span class="muted tiny">no context</span>`}
+            ${contexts.length > compactContexts.length ? `<span class="badge compact-count">+${fmt(contexts.length - compactContexts.length)}</span>` : ""}
+          </div>
+          <button class="mini-button ghost-open" type="button" data-action="select-relation" data-id="${esc(rel.record_id)}">Open</button>
+        </div>
+      </article>
+    `;
+  }
   return `
     <article class="relation-context-row ${options.compact ? "compact" : ""} ${active ? "active" : ""}" data-relation-context-id="${esc(rel.record_id)}" data-relation-event-id="${esc(eventId)}">
       <button class="relation-context-main" type="button" data-action="focus-relation-context" data-id="${esc(rel.record_id)}">
@@ -1642,24 +1679,25 @@ function eventRelationContextPanel(event, relations, options = {}) {
 function relationContextFocusContent(rel, options = {}) {
   const contexts = relationContextEntities(rel);
   const sentence = relationEvidenceSentence(rel);
+  const compact = Boolean(options.compact);
   return `
     <div class="relation-context-focus-head">
       <div>
-        <strong>Triple context</strong>
+        <strong>${compact ? "Selected provenance" : "Triple context"}</strong>
         <span>${esc(shortId(rel.record_id))}${sentence.id ? ` | ${esc(sentence.id)}` : ""}</span>
       </div>
       <button class="mini-button" type="button" data-action="select-relation" data-id="${esc(rel.record_id)}">Open relation</button>
     </div>
-    <div class="selected-triple-line">
+    <div class="selected-triple-line ${compact ? "compact" : ""}">
       <span>${esc(rel.subject || "subject")}</span>
       <strong>${esc(clean(rel.predicate || rel.predicate_class || "relation"))}</strong>
       <span>${esc(rel.object || "object")}</span>
     </div>
-    <div class="relation-context-assignment focus">
+    <div class="relation-context-assignment focus ${compact ? "compact" : ""}">
       <span class="assignment-label">assigned context</span>
       ${contexts.length ? contexts.map(relationContextEntityChip).join("") : `<span class="muted tiny">No context entities were assigned to this triple.</span>`}
     </div>
-    <div class="highlighted-sentence">
+    <div class="highlighted-sentence ${compact ? "compact" : ""}">
       ${sentence.text ? highlightRelationSentence(sentence.text, rel, contexts) : `<span class="muted">No core evidence sentence is available for this triple.</span>`}
     </div>
     ${rel.evidence_context_text && !options.compact ? `<details class="context-neighborhood"><summary>Neighboring event context</summary><p>${esc(rel.evidence_context_text)}</p></details>` : ""}
@@ -1834,9 +1872,12 @@ function eventConstellation(event) {
           ${participantGroupsMarkup(event)}
         </section>
         <section>
-          <h4>Relation hyperedges</h4>
-          <div class="mechanism-relation-stack">
-            ${relations.map((rel) => relationContextRow(rel, { eventId: event.event_id, activeId: focused?.record_id || "" })).join("") || `<div class="mini-relation muted">No relation rows.</div>`}
+          <div class="event-section-title">
+            <h4>Relation hyperedges</h4>
+            <span>select a row to update event context</span>
+          </div>
+          <div class="mechanism-relation-stack compact-stack">
+            ${relations.map((rel) => relationContextRow(rel, { compact: true, eventId: event.event_id, activeId: focused?.record_id || "" })).join("") || `<div class="mini-relation muted">No relation rows.</div>`}
           </div>
         </section>
       </div>
