@@ -1011,7 +1011,7 @@ function renderDependencyMain(dep) {
       <div class="hero-title">
         <div>
           <h2>${esc(state.data.pmcid)} dependency ${esc(shortId(dep.dependency_id))}</h2>
-          <p>Follow the source, target, bridge, or compound route from this dependency.</p>
+          <p>Read the biological claim from source event, through the dependency bridge, into the target event.</p>
         </div>
         <div>${badges([dep.tier], dep.tier)} ${badges([clean(dep.dependency_type)])}</div>
       </div>
@@ -1312,7 +1312,28 @@ function mechanismMap(dep) {
       ${eventMechanismPanel(source, "Source event")}
       ${dependencyBridgePanel(dep, depColor)}
       ${eventMechanismPanel(target, "Target event")}
+      ${dependencyEvidenceDock(dep)}
     </div>
+  `;
+}
+
+function dependencyEvidenceDock(dep) {
+  const sourceRelations = state.indexes.relationsByEvent.get(dep.upstream_event_id) || [];
+  const targetRelations = state.indexes.relationsByEvent.get(dep.downstream_event_id) || [];
+  const relations = [...sourceRelations.slice(0, 4), ...targetRelations.slice(0, 4)];
+  if (!relations.length) return "";
+  const rel = focusedRelationForEvent(relations);
+  if (!rel) return "";
+  return `
+    <section class="dependency-evidence-dock">
+      <div class="dependency-evidence-head">
+        <strong>Evidence for selected relation</strong>
+        <span>Hover or click any relation row above to update the highlighted sentence.</span>
+      </div>
+      <div class="relation-context-focus compact" data-context-scope="dependency" data-context-event-id="" data-context-compact="true">
+        ${relationContextFocusContent(rel, { compact: true })}
+      </div>
+    </section>
   `;
 }
 
@@ -1320,8 +1341,9 @@ function eventMechanismPanel(event, role) {
   const relations = (state.indexes.relationsByEvent.get(event.event_id) || []).slice(0, 4);
   const focused = focusedRelationForEvent(relations);
   const color = colorForEvent(event.event_type);
+  const roleClass = role.toLowerCase().startsWith("source") ? "source-card" : "target-card";
   return `
-    <article class="mechanism-event-card" style="--event-color:${color}">
+    <article class="mechanism-event-card ${roleClass}" style="--event-color:${color}">
       <div class="mechanism-event-top">
         <span>${esc(role)}</span>
         <button class="subtle-link" type="button" data-action="select-event" data-id="${esc(event.event_id)}">inspect</button>
@@ -1332,26 +1354,25 @@ function eventMechanismPanel(event, role) {
       </div>
       <div class="mechanism-section participants-section">
         <div class="mechanism-section-head">
-          <strong>Entities</strong>
-          <span>relation endpoints and context</span>
+          <span class="section-index">01</span>
+          <div>
+            <strong>Actors and context</strong>
+            <span>core entities separated from conditions</span>
+          </div>
         </div>
         ${participantGroupsMarkup(event, { directLimit: 5, contextLimit: 4, otherLimit: 2 })}
       </div>
       <div class="mechanism-section triples-section">
         <div class="mechanism-section-head">
-          <strong>Triples</strong>
-          <span>select a row to update provenance</span>
+          <span class="section-index">02</span>
+          <div>
+            <strong>Relations</strong>
+            <span>each row is one extracted triple</span>
+          </div>
         </div>
         <div class="mechanism-relation-stack compact-stack">
           ${relations.map((rel) => relationContextRow(rel, { compact: true, eventId: event.event_id, activeId: focused?.record_id || "" })).join("") || `<div class="mini-relation muted">No relations.</div>`}
         </div>
-      </div>
-      <div class="mechanism-section provenance-section">
-        <div class="mechanism-section-head">
-          <strong>Provenance</strong>
-          <span>selected triple evidence</span>
-        </div>
-        ${eventRelationContextPanel(event, relations, { compact: true })}
       </div>
     </article>
   `;
@@ -1361,17 +1382,20 @@ function dependencyBridgePanel(dep, color) {
   return `
     <article class="mechanism-bridge-card" style="--dep-color:${color}">
       <div class="bridge-line" aria-hidden="true"></div>
-      <div class="bridge-chip">
+      <div class="bridge-card-core">
+        <span class="bridge-eyebrow">Dependency link</span>
         <strong>${esc(clean(dep.dependency_type))}</strong>
-        <span>${esc(dep.tier)}${dep.confidence ? ` | ${esc(dep.confidence)}` : ""}</span>
-      </div>
-      <div class="bridge-summary">
-        <span class="key">Bridge</span>
-        <strong>${esc(asArray(dep.bridge_entities).join(", ") || "evidence")}</strong>
-      </div>
-      <div class="bridge-summary">
-        <span class="key">Reason</span>
-        <strong>${esc(clean(dep.reason_code || "-"))}</strong>
+        <span class="bridge-tier">${esc(dep.tier)}${dep.confidence ? ` | confidence ${esc(dep.confidence)}` : ""}</span>
+        <div class="bridge-facts">
+          <div>
+            <span>Bridge</span>
+            <strong>${esc(asArray(dep.bridge_entities).join(", ") || "evidence")}</strong>
+          </div>
+          <div>
+            <span>Reason</span>
+            <strong>${esc(clean(dep.reason_code || "-"))}</strong>
+          </div>
+        </div>
       </div>
     </article>
   `;
@@ -1442,16 +1466,16 @@ function participantGroupsMarkup(event, limits = {}) {
   const sections = [
     {
       key: "direct",
-      label: "Relation entities",
-      hint: "subject/object",
+      label: "Core actors",
+      hint: "used in relations",
       eventId: event.event_id,
       items: groups.direct,
       limit: limits.directLimit ?? 8
     },
     {
       key: "context",
-      label: "Context entities",
-      hint: "experimental setting",
+      label: "Context",
+      hint: "conditions and setting",
       eventId: event.event_id,
       items: groups.context,
       limit: limits.contextLimit ?? 8
@@ -1482,7 +1506,7 @@ function participantGroupSection(section) {
     <div class="participant-group ${esc(section.key)}">
       <div class="participant-group-head">
         <strong>${esc(section.label)}</strong>
-        <span>${esc(section.hint)}</span>
+        <span>${fmt(section.items.length)} | ${esc(section.hint)}</span>
       </div>
       <div class="mechanism-entity-strip">
         ${shown.map((entity) => entityMiniChip(entity, section.key)).join("")}
@@ -1572,12 +1596,13 @@ function participantDetailCard(entity, groupKey) {
 }
 
 function entityMiniChip(entity, role = "direct") {
-  const secondary = entitySecondaryLine(entity);
+  const secondary = entityVisualDescriptor(entity);
+  const label = entityName(entity);
   return `
-    <button class="mini-entity-chip ${esc(role)}-entity" type="button" data-action="open-entity" data-id="${esc(entity.node_id)}" style="--entity-color:${colorForEntity(entity.entity_type)}">
+    <button class="mini-entity-chip ${esc(role)}-entity" type="button" data-action="open-entity" data-id="${esc(entity.node_id)}" style="--entity-color:${colorForEntity(entity.entity_type)}" title="${esc(`${label}${secondary ? ` - ${secondary}` : ""}`)}">
       <span class="dot"></span>
       <span>
-        <strong>${esc(entityName(entity))}</strong>
+        <strong>${esc(label)}</strong>
         <small>${esc(secondary)}</small>
       </span>
     </button>
@@ -1628,10 +1653,10 @@ function relationContextRow(rel, options = {}) {
         </button>
         <div class="compact-relation-meta">
           <div class="compact-context-strip">
-            ${compactContexts.length ? compactContexts.map(relationContextEntityChip).join("") : `<span class="muted tiny">no context</span>`}
+            ${compactContexts.length ? `<span class="context-strip-label">context</span>${compactContexts.map(relationContextEntityChip).join("")}` : ""}
             ${contexts.length > compactContexts.length ? `<span class="badge compact-count">+${fmt(contexts.length - compactContexts.length)}</span>` : ""}
           </div>
-          <button class="mini-button ghost-open" type="button" data-action="select-relation" data-id="${esc(rel.record_id)}">Open</button>
+          <button class="mini-button ghost-open" type="button" data-action="select-relation" data-id="${esc(rel.record_id)}">Details</button>
         </div>
       </article>
     `;
@@ -1680,6 +1705,24 @@ function relationContextFocusContent(rel, options = {}) {
   const contexts = relationContextEntities(rel);
   const sentence = relationEvidenceSentence(rel);
   const compact = Boolean(options.compact);
+  if (compact) {
+    return `
+      <div class="relation-context-focus-head">
+        <div>
+          <strong>Evidence sentence</strong>
+          <span>highlighted actors and assigned context</span>
+        </div>
+        <button class="mini-button ghost-open" type="button" data-action="select-relation" data-id="${esc(rel.record_id)}">Details</button>
+      </div>
+      <div class="relation-context-assignment focus compact">
+        <span class="assignment-label">Context for this relation</span>
+        ${contexts.length ? contexts.map(relationContextEntityChip).join("") : `<span class="muted tiny">No context entities were assigned to this relation.</span>`}
+      </div>
+      <div class="highlighted-sentence compact">
+        ${sentence.text ? highlightRelationSentence(sentence.text, rel, contexts) : `<span class="muted">No core evidence sentence is available for this relation.</span>`}
+      </div>
+    `;
+  }
   return `
     <div class="relation-context-focus-head">
       <div>
@@ -1714,7 +1757,8 @@ function updateRelationContextFocus(relationId, eventId = "") {
     row.classList.toggle("active", sameRelation && sameEvent);
   });
   document.querySelectorAll("[data-context-event-id]").forEach((panel) => {
-    if (eventId && panel.getAttribute("data-context-event-id") !== eventId) return;
+    const isDependencyDock = panel.getAttribute("data-context-scope") === "dependency";
+    if (eventId && !isDependencyDock && panel.getAttribute("data-context-event-id") !== eventId) return;
     const compact = panel.getAttribute("data-context-compact") === "true";
     panel.innerHTML = relationContextFocusContent(rel, { compact });
   });
@@ -1868,13 +1912,13 @@ function eventConstellation(event) {
       </div>
       <div class="event-workbench-grid">
         <section>
-          <h4>Key participants</h4>
+          <h4>Actors and context</h4>
           ${participantGroupsMarkup(event)}
         </section>
         <section>
           <div class="event-section-title">
-            <h4>Relation hyperedges</h4>
-            <span>select a row to update event context</span>
+            <h4>Relations</h4>
+            <span>hover or click a row to inspect evidence</span>
           </div>
           <div class="mechanism-relation-stack compact-stack">
             ${relations.map((rel) => relationContextRow(rel, { compact: true, eventId: event.event_id, activeId: focused?.record_id || "" })).join("") || `<div class="mini-relation muted">No relation rows.</div>`}
@@ -2390,6 +2434,47 @@ function entitySecondaryLine(entity) {
   return compoundClassLine(entity) || geneProteinLine(entity) || ontologyLabel(entity) || clean(entity?.entity_type);
 }
 
+function entityVisualDescriptor(entity) {
+  if (!entity) return "";
+  const compound = compoundClassLine(entity);
+  if (compound) return shortText(stripOntologyIds(compound), 42);
+  const geneProtein = geneProteinVisualLine(entity);
+  if (geneProtein) return shortText(geneProtein, 42);
+  const selected = stripOntologyIds(entity.selected_label || entity.normalized_label || "");
+  const name = entityName(entity).toLowerCase();
+  if (selected && selected.toLowerCase() !== name) return shortText(selected, 42);
+  return entityVisualTypeLabel(entity);
+}
+
+function entityVisualTypeLabel(entity) {
+  const type = entity?.entity_type || "";
+  const labels = {
+    compound: "compound",
+    gene_protein: "gene or protein",
+    gene: "gene",
+    protein: "protein",
+    plant_trait: "plant trait",
+    molecular_trait_or_function: "molecular function",
+    pathway_or_process: "pathway or process",
+    experimental_condition: "condition",
+    anatomical_part: "tissue or anatomy",
+    taxon: "organism",
+    assay_or_measurement: "assay",
+    phenotype: "phenotype"
+  };
+  return labels[type] || clean(type || "entity");
+}
+
+function stripOntologyIds(value) {
+  return String(value || "")
+    .replace(/\s*\(([A-Z][A-Z0-9_]*|[A-Za-z]+):[^)]*\)/g, "")
+    .replace(/\b(?:GO|PO|TO|PECO|CHEBI|ChEBI|PubChem|UniProt|InterPro|Pfam|Phytozome):\S+/g, "")
+    .replace(/\s*\|\s*/g, " | ")
+    .replace(/\s+/g, " ")
+    .replace(/^\s*\|\s*|\s*\|\s*$/g, "")
+    .trim();
+}
+
 function compoundStatusLabel(entity) {
   const compound = compoundMeta(entity);
   if (!compound) return "";
@@ -2601,6 +2686,21 @@ function geneProteinLine(entity) {
   const gene = selected.gene_name || phytozome.gene_id || family.alias || best.gene_query || "";
   const scope = best.normalization_scope || best.decision || "";
   return [accession || phytozome.ontology_id || family.ontology_id, gene, clean(scope)].filter(Boolean).slice(0, 3).join(" | ");
+}
+
+function geneProteinVisualLine(entity) {
+  const profile = geneProteinMeta(entity);
+  if (!profile) return "";
+  const best = profile.best || {};
+  const family = { ...(asArray(profile.family_ids)[0] || {}), ...(best.family || {}) };
+  const taxon = best.taxon_context || {};
+  const scope = clean(best.normalization_scope || best.decision || "");
+  const familyLabel = stripOntologyIds(family.label || family.name || family.alias || "");
+  const taxonName = stripOntologyIds(taxon.scientific_name || taxon.name || "");
+  if (familyLabel) return familyLabel;
+  if (taxonName && /species|resolved|sequence/i.test(scope)) return `${taxonName} sequence`;
+  if (scope && scope !== "unknown") return scope;
+  return entityVisualTypeLabel(entity);
 }
 
 function geneProteinProfile(entity) {
