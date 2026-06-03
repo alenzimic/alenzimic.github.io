@@ -1693,19 +1693,121 @@ function dependencyEvidenceDock(dep) {
   const sourceRelations = state.indexes.relationsByEvent.get(dep.upstream_event_id) || [];
   const targetRelations = state.indexes.relationsByEvent.get(dep.downstream_event_id) || [];
   const relations = [...sourceRelations.slice(0, 4), ...targetRelations.slice(0, 4)];
-  if (!relations.length) return "";
+  const pairs = dependencySupportingRelationPairs(dep);
+  const source = state.indexes.eventById.get(dep.upstream_event_id);
+  const target = state.indexes.eventById.get(dep.downstream_event_id);
+  if (!relations.length && !pairs.length) return "";
   const rel = focusedRelationForEvent(relations);
-  if (!rel) return "";
   return `
     <section class="dependency-evidence-dock">
       <div class="dependency-evidence-head">
-        <strong>Evidence for selected relation</strong>
-        <span>Hover or click any relation row above to update the highlighted sentence.</span>
+        <strong>Evidence linking these events</strong>
+        <span>Source and target triples are shown together with their evidence sentences and bridge provenance.</span>
       </div>
-      <div class="relation-context-focus compact" data-context-scope="dependency" data-context-event-id="" data-context-compact="true">
-        ${relationContextFocusContent(rel, { compact: true })}
-      </div>
+      ${pairs.length ? pairs.slice(0, 4).map((pair, index) => dependencyProofCard(dep, pair, index)).join("") : dependencyFallbackEventEvidence(dep, source, target)}
+      ${rel ? `
+        <div class="relation-context-focus compact" data-context-scope="dependency" data-context-event-id="" data-context-compact="true">
+          ${relationContextFocusContent(rel, { compact: true })}
+        </div>
+      ` : ""}
     </section>
+  `;
+}
+
+function dependencySupportingRelationPairs(dep) {
+  return asArray(dep.supporting_relation_pairs)
+    .map((pair) => {
+      const ids = String(pair || "").split("->").map((id) => id.trim()).filter(Boolean);
+      const sourceRel = state.indexes.relationById.get(ids[0]);
+      const targetRel = state.indexes.relationById.get(ids[1]);
+      return { pair, ids, sourceRel, targetRel };
+    })
+    .filter((row) => row.sourceRel || row.targetRel || row.ids.length);
+}
+
+function dependencyProofCard(dep, pair, index) {
+  return `
+    <article class="dependency-proof-card">
+      <div class="dependency-proof-head">
+        <div>
+          <strong>Supporting evidence pair ${fmt(index + 1)}</strong>
+          <span>${esc(pair.ids.join(" -> ") || pair.pair || "relation pair")}</span>
+        </div>
+        <div>${badges([dep.support_verdict || dep.verdict, clean(dep.dependency_type)], dep.tier)}</div>
+      </div>
+      <div class="dependency-proof-flow">
+        ${relationProofCard(pair.sourceRel, "Source triple")}
+        <div class="dependency-proof-bridge">
+          <span>Dependency link</span>
+          <strong>${esc(clean(dep.dependency_type || "event dependency"))}</strong>
+          ${asArray(dep.bridge_entities).length ? `<small>Bridge: ${esc(asArray(dep.bridge_entities).join(", "))}</small>` : ""}
+          ${dep.reason_code ? `<small>Reason: ${esc(clean(dep.reason_code))}</small>` : ""}
+        </div>
+        ${relationProofCard(pair.targetRel, "Target triple")}
+      </div>
+    </article>
+  `;
+}
+
+function relationProofCard(rel, role) {
+  if (!rel) return `<div class="proof-relation-card muted">${esc(role)} relation was not found in this paper bundle.</div>`;
+  const sentence = relationEvidenceSentence(rel);
+  const contexts = relationContextEntities(rel);
+  const sentenceId = sentence.id || asArray(rel.evidence_sentence_ids)[0] || "";
+  const sentenceMeta = sentenceMetadataLine(sentenceId);
+  return `
+    <article class="proof-relation-card">
+      <div class="proof-relation-head">
+        <span>${esc(role)}</span>
+        <button class="mini-button" type="button" data-action="select-relation" data-id="${esc(rel.record_id)}">Open relation</button>
+      </div>
+      <div class="selected-triple-line compact">
+        <span>${esc(rel.subject || "subject")}</span>
+        <strong>${esc(clean(rel.predicate || rel.predicate_class || "relation"))}</strong>
+        <span>${esc(rel.object || "object")}</span>
+      </div>
+      ${sentenceMeta ? `<div class="proof-sentence-meta">${sentenceMeta}</div>` : ""}
+      ${contexts.length ? `<div class="relation-context-assignment focus compact"><span class="assignment-label">sentence context</span>${contexts.map(relationContextEntityChip).join("")}</div>` : ""}
+      <p>${sentence.text ? highlightRelationSentence(sentence.text, rel, contexts) : `<span class="muted">No evidence text found for this relation.</span>`}</p>
+    </article>
+  `;
+}
+
+function sentenceMetadataLine(sentenceId) {
+  if (!sentenceId) return "";
+  const sentence = state.indexes.sentenceById.get(sentenceId);
+  const items = [
+    sentence?.section ? clean(sentence.section) : "",
+    sentence?.passage_index ? `passage ${sentence.passage_index}` : "",
+    sentence?.sentence_index ? `sentence ${sentence.sentence_index}` : "",
+    sentenceId
+  ].filter(Boolean);
+  return items.map((item) => `<span>${esc(item)}</span>`).join("");
+}
+
+function dependencyFallbackEventEvidence(dep, source, target) {
+  const cards = [
+    eventEvidenceProofCard(source, "Source event"),
+    eventEvidenceProofCard(target, "Target event")
+  ].filter(Boolean).join("");
+  return cards ? `<div class="dependency-proof-flow fallback">${cards}</div>` : `<div class="compact-card muted">No event evidence sentences were available for this dependency.</div>`;
+}
+
+function eventEvidenceProofCard(event, role) {
+  if (!event) return "";
+  const sentenceIds = asArray(event.evidence_sentence_ids);
+  return `
+    <article class="proof-relation-card">
+      <div class="proof-relation-head">
+        <span>${esc(role)}</span>
+        <button class="mini-button" type="button" data-action="select-event" data-id="${esc(event.event_id)}">Open event</button>
+      </div>
+      <strong>${esc(event.event_label || event.event_id)}</strong>
+      ${sentenceIds.length ? sentenceIds.map((id) => {
+        const sentence = state.indexes.sentenceById.get(id);
+        return `<p>${sentenceMetadataLine(id)}${sentence?.text ? `<br>${esc(sentence.text)}` : ""}</p>`;
+      }).join("") : `<p class="muted">No evidence sentence IDs.</p>`}
+    </article>
   `;
 }
 
@@ -2509,12 +2611,76 @@ function renderEventMain(event) {
         </div>
       </div>
     </section>
+    ${eventProvenanceMap(event, relations)}
     ${disclosureSection("Relation Hyperedges In This Event", `
       <div class="relation-list">${relations.map((rel) => relationContextRow(rel, { eventId: event.event_id, activeId: focused?.record_id || "" })).join("") || `<div class="compact-card muted">No relations.</div>`}</div>
     `, fmt(relations.length))}
     ${disclosureSection("Dependencies Touching This Event", `
       ${dependencyButtons(deps, event.event_id)}
     `, fmt(deps.length))}
+  `;
+}
+
+function eventProvenanceMap(event, relations) {
+  const groups = eventProvenanceGroups(relations);
+  if (!groups.length) return "";
+  return `
+    <section class="section-card event-provenance-panel">
+      <div class="section-header">
+        <div>
+          <h2>Triple Provenance Map</h2>
+          <span class="muted">Triples grouped by the sentence and passage that generated them.</span>
+        </div>
+        <span class="muted">${fmt(groups.length)} evidence groups</span>
+      </div>
+      <div class="event-provenance-grid">
+        ${groups.slice(0, 8).map((group) => eventProvenanceCard(group, event)).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function eventProvenanceGroups(relations) {
+  const bySentence = new Map();
+  relations.forEach((rel) => {
+    const sentenceIds = asArray(rel.evidence_sentence_ids);
+    const keys = sentenceIds.length ? sentenceIds : [`relation:${rel.record_id}`];
+    keys.forEach((key) => {
+      if (!bySentence.has(key)) bySentence.set(key, { sentenceId: sentenceIds.length ? key : "", fallbackKey: key, relations: [] });
+      bySentence.get(key).relations.push(rel);
+    });
+  });
+  return Array.from(bySentence.values()).sort((a, b) => {
+    const sentenceA = state.indexes.sentenceById.get(a.sentenceId);
+    const sentenceB = state.indexes.sentenceById.get(b.sentenceId);
+    const passageSort = Number(sentenceA?.passage_index || 0) - Number(sentenceB?.passage_index || 0);
+    if (passageSort) return passageSort;
+    const sentenceSort = Number(sentenceA?.sentence_index || 0) - Number(sentenceB?.sentence_index || 0);
+    if (sentenceSort) return sentenceSort;
+    return String(a.sentenceId || a.fallbackKey).localeCompare(String(b.sentenceId || b.fallbackKey));
+  });
+}
+
+function eventProvenanceCard(group, event) {
+  const sentence = group.sentenceId ? state.indexes.sentenceById.get(group.sentenceId) : null;
+  const evidenceText = sentence?.text || group.relations.map((rel) => rel.evidence_preview).find(Boolean) || "";
+  const terms = group.relations.flatMap((rel) => relationHighlightLabels(rel, relationContextEntities(rel)));
+  const meta = sentenceMetadataLine(group.sentenceId);
+  return `
+    <article class="event-provenance-card">
+      <div class="event-provenance-head">
+        <div>
+          <strong>${esc(group.sentenceId || "Relation-level evidence")}</strong>
+          <span>${esc(group.relations.length)} triple${group.relations.length === 1 ? "" : "s"} in ${esc(event.event_label || event.event_id)}</span>
+          <span>${group.relations.length > 1 ? "shared sentence provenance" : "single-triple provenance"}</span>
+        </div>
+        ${meta ? `<div class="proof-sentence-meta">${meta}</div>` : ""}
+      </div>
+      <p>${evidenceText ? highlightTextRanges(evidenceText, terms) : `<span class="muted">No evidence text found for this provenance group.</span>`}</p>
+      <div class="event-provenance-relations">
+        ${group.relations.map((rel) => relationContextRow(rel, { compact: true, eventId: event.event_id, activeId: state.focusedRelationId })).join("")}
+      </div>
+    </article>
   `;
 }
 

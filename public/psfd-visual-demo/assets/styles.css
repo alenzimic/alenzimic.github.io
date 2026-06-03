@@ -1027,6 +1027,139 @@ textarea {
   line-height: 1.35;
 }
 
+.dependency-proof-card,
+.dependency-evidence-dock > .relation-context-focus {
+  grid-column: 2;
+}
+
+.dependency-proof-card {
+  display: grid;
+  gap: 9px;
+  padding: 10px;
+  border: 1px solid #c9ddd5;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.dependency-proof-head {
+  min-width: 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.dependency-proof-head strong,
+.dependency-proof-head span {
+  display: block;
+}
+
+.dependency-proof-head strong {
+  color: #20312b;
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.dependency-proof-head span {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 10.5px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.dependency-proof-flow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(150px, 0.5fr) minmax(0, 1fr);
+  gap: 9px;
+  align-items: stretch;
+}
+
+.dependency-proof-flow.fallback {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.dependency-proof-bridge {
+  min-width: 0;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 5px;
+  padding: 10px;
+  border: 1px solid #cfe1da;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #f2f8f6, #fff);
+  color: #20312b;
+  text-align: center;
+}
+
+.dependency-proof-bridge span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.dependency-proof-bridge strong {
+  color: var(--accent-dark);
+  font-size: 12px;
+}
+
+.dependency-proof-bridge small {
+  color: #50635d;
+  font-size: 10.5px;
+  line-height: 1.35;
+}
+
+.proof-relation-card {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #d3e1dc;
+  border-radius: 8px;
+  background: #fbfdfc;
+}
+
+.proof-relation-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+}
+
+.proof-relation-head span {
+  color: var(--accent-dark);
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.proof-sentence-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.proof-sentence-meta span {
+  min-height: 20px;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #edf3f0;
+  color: #50635d;
+  font-size: 10.5px;
+  font-weight: 750;
+}
+
+.proof-relation-card p {
+  margin: 0;
+  color: #253a33;
+  font-size: 12px;
+  line-height: 1.48;
+}
+
 .mechanism-entity-strip {
   display: flex;
   flex-wrap: wrap;
@@ -1749,6 +1882,74 @@ textarea {
   color: #273a34;
   font-size: 12px;
   line-height: 1.48;
+}
+
+.event-provenance-panel {
+  padding: 14px;
+  border: 1px solid #d5e3de;
+  border-radius: 8px;
+  background: #fbfdfc;
+  box-shadow: var(--shadow);
+}
+
+.event-provenance-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.event-provenance-card {
+  display: grid;
+  gap: 9px;
+  padding: 11px;
+  border: 1px solid #d1e1db;
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.event-provenance-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.event-provenance-head > div {
+  min-width: 0;
+}
+
+.event-provenance-head strong,
+.event-provenance-head span {
+  display: block;
+}
+
+.event-provenance-head strong {
+  color: #20312b;
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.event-provenance-head span {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 10.5px;
+  line-height: 1.35;
+}
+
+.event-provenance-card > p {
+  margin: 0;
+  padding: 9px;
+  border: 1px solid #e0e9e5;
+  border-radius: 8px;
+  background: #f8fbfa;
+  color: #263933;
+  font-size: 12px;
+  line-height: 1.48;
+}
+
+.event-provenance-relations {
+  display: grid;
+  gap: 6px;
 }
 
 .context-neighborhood summary {
@@ -4994,6 +5195,8 @@ body[data-tab="discover"] .main-panel {
   .route-headline,
   .route-summary,
   .dependency-evidence-dock,
+  .dependency-proof-flow,
+  .dependency-proof-flow.fallback,
   .relation-context-row,
   .relation-context-main,
   .selected-triple-line,
@@ -5035,11 +5238,18 @@ body[data-tab="discover"] .main-panel {
   .annotation-ontology-panel,
   .annotation-mechanism-row > div,
   .annotation-trait-row,
+  .dependency-proof-head,
+  .event-provenance-head,
   .research-signal-card {
     grid-template-columns: 1fr;
   }
 
   .annotation-summary-head {
+    display: grid;
+  }
+
+  .dependency-proof-head,
+  .event-provenance-head {
     display: grid;
   }
 
