@@ -3900,6 +3900,8 @@ body[data-tab="discover"] .main-panel {
 
 .annotation-input-panel {
   grid-area: input;
+  position: relative;
+  isolation: isolate;
   display: grid;
   gap: 12px;
   padding: 16px;
@@ -3953,13 +3955,15 @@ body[data-tab="discover"] .main-panel {
 
 .annotation-input-panel textarea {
   position: relative;
-  z-index: 1;
+  z-index: 5;
   min-height: 210px;
   border-color: #b9c9c3;
   background: #fbfcfb;
   font-size: 14px;
   pointer-events: auto;
   user-select: text;
+  -webkit-user-select: text;
+  caret-color: var(--accent-dark);
 }
 
 .annotation-input-panel .annotation-examples {
@@ -3973,7 +3977,7 @@ body[data-tab="discover"] .main-panel {
 .annotation-input-panel button,
 .simple-advanced-nav button {
   position: relative;
-  z-index: 1;
+  z-index: 5;
   pointer-events: auto;
 }
 
@@ -4062,6 +4066,235 @@ body[data-tab="discover"] .main-panel {
   flex-wrap: wrap;
   gap: 6px;
   min-width: 145px;
+}
+
+.annotation-summary-list {
+  display: grid;
+  gap: 12px;
+}
+
+.annotation-summary-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--entity-color, var(--accent)) 18%, var(--line));
+  border-left: 4px solid var(--entity-color, var(--accent));
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+
+.annotation-summary-card.unmatched {
+  --entity-color: var(--danger);
+  background: #fffafa;
+}
+
+.annotation-summary-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: start;
+}
+
+.annotation-summary-head span,
+.annotation-summary-head small,
+.annotation-summary-card p,
+.summary-mini-panel span,
+.summary-theme-row span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.annotation-summary-head h4 {
+  margin: 2px 0;
+  color: #17211f;
+  font-size: 17px;
+  line-height: 1.18;
+}
+
+.annotation-confidence {
+  flex: 0 0 auto;
+  min-height: 26px;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--entity-color, var(--accent)) 11%, white);
+  color: color-mix(in srgb, var(--entity-color, var(--accent)) 82%, #17211f);
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.annotation-plain-summary {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid #dce8e2;
+  border-radius: 8px;
+  background: #f7fbf9;
+  color: #243832;
+}
+
+.annotation-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.summary-mini-panel,
+.summary-theme-panel {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfb;
+}
+
+.summary-mini-panel h5,
+.summary-theme-panel h5,
+.research-signal-head h5 {
+  margin: 0 0 8px;
+  color: #31413c;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.summary-mini-panel > div {
+  display: grid;
+  gap: 7px;
+}
+
+.summary-mini-panel div div {
+  min-width: 0;
+}
+
+.summary-mini-panel span,
+.summary-mini-panel strong {
+  display: block;
+}
+
+.summary-mini-panel strong {
+  margin-top: 2px;
+  color: #1e2d29;
+  font-size: 12px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.annotation-biology-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.summary-theme-panel > div {
+  display: grid;
+  gap: 6px;
+}
+
+.summary-theme-row {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 7px 8px;
+  border-radius: 7px;
+  background: #f4f8f6;
+}
+
+.summary-theme-row strong {
+  color: #1f322d;
+  font-size: 12px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.annotation-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.research-signal-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+  gap: 12px;
+}
+
+.research-signal-group {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.research-signal-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.research-signal-head h5 {
+  margin: 0;
+}
+
+.research-signal-head span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.research-signal-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 10px;
+  align-items: center;
+  padding: 9px 0;
+  border-top: 1px solid #edf2ef;
+}
+
+.research-signal-card:first-of-type {
+  border-top: 0;
+}
+
+.research-signal-card strong,
+.research-signal-card span,
+.research-signal-card small {
+  display: block;
+  min-width: 0;
+}
+
+.research-signal-card strong {
+  color: #20312b;
+  font-size: 13px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.research-signal-card span,
+.research-signal-card small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.research-signal-card small {
+  grid-column: 1 / -1;
+}
+
+.research-signal-score {
+  min-width: 64px;
+  padding: 6px 8px;
+  border-radius: 7px;
+  background: #eef6f2;
+  text-align: center;
+}
+
+.research-signal-score strong {
+  color: var(--accent-dark);
+  font-size: 18px;
 }
 
 .enrichment-grid {
@@ -4216,6 +4449,17 @@ body[data-tab="discover"] .main-panel {
 
   .annotation-metadata {
     grid-template-columns: 1fr;
+  }
+
+  .annotation-summary-head,
+  .annotation-summary-grid,
+  .annotation-biology-grid,
+  .research-signal-card {
+    grid-template-columns: 1fr;
+  }
+
+  .annotation-summary-head {
+    display: grid;
   }
 
   .mechanism-board,
