@@ -4221,6 +4221,7 @@ function rankedEntityMatches(term) {
       const ontologyLocalIds = ontologyIds.map((id) => id.includes(":") ? id.split(":").slice(1).join(":") : id);
       const selected = String(entity.selected_label || "").toLowerCase();
       const search = globalEntitySearchText(entity);
+      const compoundText = compoundAliasSearchText(entity);
       let score = 0;
       if (ontology === query) score += 120;
       if (ontologyIds.includes(query)) score += 120;
@@ -4233,12 +4234,66 @@ function rankedEntityMatches(term) {
         if (name.includes(query) || selected.includes(query)) score += 50;
         if (search.includes(query)) score += 30;
       }
+      if (isCompoundLikeGlobalEntity(entity)) {
+        if (name === query || selected === query || textHasQueryToken(compoundText, query)) score += 45;
+        if (!shortQuery && compoundText.includes(query)) score += 30;
+      }
+      if (isChemicalExposureGlobalEntity(entity) && !querySuggestsCondition(query)) score -= 40;
       score += Math.min(20, entityEvidenceWeight(entity));
       return { entity, score };
     })
     .filter((item) => item.score > 20)
     .sort((a, b) => b.score - a.score || pathEntityName(a.entity).localeCompare(pathEntityName(b.entity)))
     .map((item) => item.entity);
+}
+
+function isCompoundLikeGlobalEntity(entity) {
+  const type = String(entity.type || entity.entity_type || "").toLowerCase();
+  const ids = [entity.ontology_id, ...asArray(entity.ontology_ids)].join(" ");
+  return type === "compound" || Boolean(Object.keys(entity.compound_classification || {}).length) || /\b(?:CHEBI|ChEBI|PubChem):/i.test(ids);
+}
+
+function isChemicalExposureGlobalEntity(entity) {
+  const type = String(entity.type || entity.entity_type || "").toLowerCase();
+  if (type !== "experimental_condition") return false;
+  const ontology = String(entity.ontology_id || "");
+  const text = [
+    entity.label,
+    entity.selected_label,
+    entity.normalized_label,
+    entity.selected_description,
+    ...asArray(entity.ontology_ids),
+  ].join(" ").toLowerCase();
+  return /^PECO:/i.test(ontology) && /\b(exposure|treatment|treated|application|hormone|acid)\b/.test(text);
+}
+
+function querySuggestsCondition(query) {
+  return /\b(exposure|treatment|treated|condition|stress|application|spray|dose|medium)\b/i.test(String(query || ""));
+}
+
+function compoundAliasSearchText(entity) {
+  const compound = entity.compound_classification || {};
+  const chebi = compound.chebi || {};
+  const pubchem = compound.pubchem || {};
+  const normalization = compound.normalization || {};
+  const raw = compound.raw_fields || {};
+  return [
+    entity.label,
+    entity.selected_label,
+    entity.normalized_label,
+    entity.ontology_id,
+    compound.canonical_form,
+    compound.aliases,
+    normalization.selected_label,
+    normalization.selected_ontology_id,
+    chebi.id,
+    chebi.name,
+    pubchem.cid ? `PubChem:${pubchem.cid}` : "",
+    raw.canonical_form,
+    raw.aliases,
+    raw.selected_label,
+    raw.selected_ontology_id,
+  ].join(" ").toLowerCase();
 }
 
 function textHasQueryToken(text, query) {
