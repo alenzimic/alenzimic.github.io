@@ -252,7 +252,8 @@ textarea {
 .filter-drawer summary,
 .source-details summary,
 .action-menu summary,
-.disclosure-section summary {
+.disclosure-section summary,
+.disclosure-summary {
   cursor: pointer;
   list-style: none;
 }
@@ -2083,18 +2084,26 @@ textarea {
   display: block;
 }
 
-.disclosure-section summary {
+.disclosure-section summary,
+.disclosure-summary {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  width: 100%;
   min-height: 42px;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: #21332d;
+  font: inherit;
   font-size: 14px;
   font-weight: 850;
+  text-align: left;
 }
 
-.disclosure-section summary::after {
+.disclosure-section summary::after,
+.disclosure-summary::after {
   content: "+";
   width: 24px;
   height: 24px;
@@ -2106,11 +2115,13 @@ textarea {
   font-size: 16px;
 }
 
-.disclosure-section[open] summary::after {
+.disclosure-section[open] summary::after,
+.disclosure-section.open .disclosure-summary::after {
   content: "-";
 }
 
-.disclosure-section summary small {
+.disclosure-section summary small,
+.disclosure-summary small {
   margin-left: auto;
   color: var(--muted);
   font-size: 12px;

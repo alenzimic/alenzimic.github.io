@@ -46,6 +46,7 @@ const state = {
   annotationEditing: false,
   annotationCategory: "auto",
   annotationSelectionIds: {},
+  disclosureOpen: {},
   focusedRelationId: "",
   listPage: 0,
   listPageSize: 12,
@@ -459,6 +460,9 @@ function runButtonAction(action, id, actionTarget) {
       state.entityType = actionTarget.getAttribute("data-value") || "all";
       state.listPage = 0;
       render();
+      return true;
+    case "toggle-disclosure":
+      toggleDisclosure(id);
       return true;
     case "export-hypothesis":
       exportHypothesisReport(Number(actionTarget.getAttribute("data-index") || 0));
@@ -2745,15 +2749,29 @@ function actionMenu(items, label = "Actions") {
 }
 
 function disclosureSection(title, body, meta = "", open = false) {
+  const key = disclosureKey(title);
+  const isOpen = Object.prototype.hasOwnProperty.call(state.disclosureOpen, key)
+    ? Boolean(state.disclosureOpen[key])
+    : Boolean(open);
   return `
-    <details class="section-card disclosure-section" ${open ? "open" : ""}>
-      <summary>
+    <section class="section-card disclosure-section ${isOpen ? "open" : ""}" data-disclosure-key="${esc(key)}">
+      <button class="disclosure-summary" type="button" data-action="toggle-disclosure" data-id="${esc(key)}" aria-expanded="${isOpen ? "true" : "false"}">
         <span>${esc(title)}</span>
         ${meta ? `<small>${esc(meta)}</small>` : ""}
-      </summary>
-      <div class="disclosure-body">${body}</div>
-    </details>
+      </button>
+      <div class="disclosure-body" ${isOpen ? "" : "hidden"}>${body}</div>
+    </section>
   `;
+}
+
+function disclosureKey(title) {
+  return String(title || "section").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "section";
+}
+
+function toggleDisclosure(key) {
+  if (!key) return;
+  state.disclosureOpen[key] = !state.disclosureOpen[key];
+  render();
 }
 
 function compoundMeta(entity) {
