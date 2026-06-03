@@ -2103,7 +2103,7 @@ function relationContextFocusContent(rel, options = {}) {
     <div class="highlighted-sentence ${compact ? "compact" : ""}">
       ${sentence.text ? highlightRelationSentence(sentence.text, rel, contexts) : `<span class="muted">No core evidence sentence is available for this triple.</span>`}
     </div>
-    ${rel.evidence_context_text && !options.compact ? `<details class="context-neighborhood"><summary>Neighboring event context</summary><p>${esc(rel.evidence_context_text)}</p></details>` : ""}
+    ${rel.evidence_context_text && !options.compact ? disclosureSection("Neighboring event context", `<p>${esc(rel.evidence_context_text)}</p>`, "", false, rel.record_id) : ""}
   `;
 }
 
@@ -2552,7 +2552,7 @@ function relationEvidence(rel) {
       <div class="evidence-block">
         <strong>Evidence Sentence</strong>
         ${evidence.text ? `<p>${highlightRelationSentence(evidence.text, rel, localContexts)}</p>` : sentences.length ? sentences.map((id) => `<p>${esc(sentenceText(id))}</p>`).join("") : `<span class="muted">No evidence sentence IDs.</span>`}
-        ${rel.evidence_context_text ? `<details><summary>Neighboring context</summary><p>${esc(rel.evidence_context_text)}</p></details>` : ""}
+        ${rel.evidence_context_text ? disclosureSection("Neighboring context", `<p>${esc(rel.evidence_context_text)}</p>`, "", false, rel.record_id) : ""}
       </div>
     </div>
   `;
@@ -2748,8 +2748,8 @@ function actionMenu(items, label = "Actions") {
   `;
 }
 
-function disclosureSection(title, body, meta = "", open = false) {
-  const key = disclosureKey(title);
+function disclosureSection(title, body, meta = "", open = false, keySuffix = "") {
+  const key = disclosureKey([title, keySuffix].filter(Boolean).join(" "));
   const isOpen = Object.prototype.hasOwnProperty.call(state.disclosureOpen, key)
     ? Boolean(state.disclosureOpen[key])
     : Boolean(open);
