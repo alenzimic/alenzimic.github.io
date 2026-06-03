@@ -2130,7 +2130,7 @@ function relationContextFocusContent(rel, options = {}) {
     <div class="highlighted-sentence ${compact ? "compact" : ""}">
       ${sentence.text ? highlightRelationSentence(sentence.text, rel, contexts) : `<span class="muted">No core evidence sentence is available for this triple.</span>`}
     </div>
-    ${rel.evidence_context_text && !options.compact ? disclosureSection("Neighboring event context", `<p>${esc(rel.evidence_context_text)}</p>`, "", false, rel.record_id) : ""}
+    ${!options.compact ? neighboringContextDisclosure(rel, "Neighboring event context") : ""}
   `;
 }
 
@@ -2579,9 +2579,47 @@ function relationEvidence(rel) {
       <div class="evidence-block">
         <strong>Evidence Sentence</strong>
         ${evidence.text ? `<p>${highlightRelationSentence(evidence.text, rel, localContexts)}</p>` : sentences.length ? sentences.map((id) => `<p>${esc(sentenceText(id))}</p>`).join("") : `<span class="muted">No evidence sentence IDs.</span>`}
-        ${rel.evidence_context_text ? disclosureSection("Neighboring context", `<p>${esc(rel.evidence_context_text)}</p>`, "", false, rel.record_id) : ""}
+        ${neighboringContextDisclosure(rel, "Neighboring context")}
       </div>
     </div>
+  `;
+}
+
+function neighboringContextDisclosure(rel, title) {
+  const rows = asArray(rel.evidence_context_sentences).filter((row) => row && typeof row === "object" && (row.text || row.id));
+  if (!rows.length && !rel.evidence_context_text) return "";
+  const body = rows.length ? `
+    <div class="context-provenance-list">
+      ${rows.map((row) => contextSentenceCard(row, rel)).join("")}
+    </div>
+  ` : `<p>${esc(rel.evidence_context_text)}</p>`;
+  const meta = rows.length ? `${fmt(rows.length)} sentences` : "";
+  return disclosureSection(title, body, meta, false, rel.record_id);
+}
+
+function contextSentenceCard(row, rel) {
+  const role = String(row.role || "neighboring context").toLowerCase();
+  const isCore = role.includes("core");
+  const section = clean(row.section || "unknown section");
+  const passage = row.passage_id || rel.current_passage_id || "";
+  const sentenceNumber = row.sentence_index ? `sentence ${row.sentence_index}` : "";
+  const passageNumber = row.passage_index ? `passage ${row.passage_index}` : "";
+  const metadata = [
+    isCore ? "core evidence" : "neighbor context",
+    section,
+    passageNumber,
+    sentenceNumber,
+    row.id || ""
+  ].filter(Boolean);
+  const contexts = rawRelationContextEntities(rel);
+  return `
+    <article class="context-provenance-card ${isCore ? "core" : "neighbor"}">
+      <div class="context-provenance-meta">
+        ${metadata.map((item, index) => `<span class="${index === 0 ? "role" : ""}">${esc(item)}</span>`).join("")}
+      </div>
+      ${passage ? `<div class="context-provenance-passage">${esc(passage)}</div>` : ""}
+      <p>${highlightRelationSentence(row.text || "", rel, contexts)}</p>
+    </article>
   `;
 }
 

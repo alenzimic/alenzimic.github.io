@@ -1688,6 +1688,69 @@ textarea {
   box-shadow: inset 0 -1px 0 rgba(15, 118, 110, 0.35);
 }
 
+.context-provenance-list {
+  display: grid;
+  gap: 8px;
+}
+
+.context-provenance-card {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid #d5e3de;
+  border-left: 3px solid #87a8a0;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.context-provenance-card.core {
+  border-left-color: var(--accent);
+  background: #f7fbf9;
+}
+
+.context-provenance-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+}
+
+.context-provenance-meta span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #edf3f0;
+  color: #53645f;
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0;
+}
+
+.context-provenance-meta .role {
+  background: #e1efec;
+  color: var(--accent-dark);
+}
+
+.context-provenance-card.core .context-provenance-meta .role {
+  background: #d8eee7;
+  color: #0b534f;
+}
+
+.context-provenance-passage {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.context-provenance-card p {
+  margin: 0;
+  color: #273a34;
+  font-size: 12px;
+  line-height: 1.48;
+}
+
 .context-neighborhood summary {
   color: var(--accent-dark);
   font-size: 11px;
