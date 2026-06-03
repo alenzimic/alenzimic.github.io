@@ -3829,6 +3829,307 @@ textarea {
   }
 }
 
+body[data-tab="discover"] .topbar {
+  grid-template-columns: 1fr;
+  height: 64px;
+}
+
+body[data-tab="discover"] .top-controls,
+body[data-tab="discover"] .sidebar,
+body[data-tab="discover"] .inspector {
+  display: none;
+}
+
+body[data-tab="discover"] .shell {
+  display: block;
+  height: auto;
+  min-height: calc(100vh - 64px);
+}
+
+body[data-tab="discover"] .main-panel {
+  min-height: calc(100vh - 64px);
+  overflow: visible;
+  padding: 0;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(246, 248, 245, 0.94)),
+    var(--bg);
+}
+
+.annotation-page {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.annotation-page > .hero-title {
+  align-items: end;
+  margin-bottom: 18px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.annotation-page > .hero-title h2 {
+  font-size: 26px;
+}
+
+.annotation-page > .hero-title p {
+  max-width: 760px;
+  font-size: 14px;
+}
+
+.annotation-workflow {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.82fr) minmax(620px, 1.35fr);
+  grid-template-areas:
+    "input annotations"
+    "enrichment enrichment"
+    "advanced advanced";
+  gap: 14px;
+  align-items: start;
+}
+
+.annotation-input-panel,
+.annotation-output-panel,
+.simple-advanced-nav {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: var(--shadow);
+}
+
+.annotation-input-panel {
+  grid-area: input;
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+.annotation-output-panel {
+  grid-area: annotations;
+  padding: 16px;
+}
+
+.enrichment-panel {
+  grid-area: enrichment;
+}
+
+.annotation-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.annotation-panel-head > span {
+  flex: 0 0 auto;
+  min-width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #c8d7d1;
+  border-radius: 6px;
+  background: #eef6f2;
+  color: var(--accent-dark);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.annotation-panel-head h3,
+.simple-advanced-nav h3 {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.2;
+}
+
+.annotation-panel-head small,
+.simple-advanced-nav small {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.annotation-input-panel textarea {
+  min-height: 210px;
+  border-color: #b9c9c3;
+  background: #fbfcfb;
+  font-size: 14px;
+}
+
+.annotation-input-panel .annotation-examples {
+  gap: 6px;
+}
+
+.annotation-input-panel .annotation-actions {
+  gap: 8px;
+}
+
+.annotation-status,
+.annotation-empty {
+  min-height: 38px;
+  padding: 10px 12px;
+  border: 1px solid #d9e4df;
+  border-radius: 8px;
+  background: #f6faf8;
+  color: #41524d;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.annotation-table-wrap {
+  width: 100%;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.annotation-table {
+  width: 100%;
+  min-width: 980px;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.annotation-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 10px;
+  border-bottom: 1px solid var(--line);
+  background: #f2f6f4;
+  color: #50625c;
+  font-size: 10.5px;
+  font-weight: 850;
+  letter-spacing: 0;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.annotation-table td {
+  max-width: 270px;
+  padding: 10px;
+  border-bottom: 1px solid #edf2ef;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.annotation-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.annotation-table tr:hover td {
+  background: #f8fbfa;
+}
+
+.annotation-table tr.unmatched td {
+  color: #6f4b53;
+  background: #fff8f8;
+}
+
+.annotation-table strong,
+.annotation-table span,
+.annotation-table small {
+  display: block;
+}
+
+.annotation-table strong {
+  color: #20312b;
+  font-size: 12.5px;
+}
+
+.annotation-table small {
+  margin-top: 3px;
+  color: var(--muted);
+  line-height: 1.3;
+}
+
+.annotation-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 145px;
+}
+
+.enrichment-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 10px;
+}
+
+.enrichment-card {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #d7e4de;
+  border-left: 4px solid var(--accent);
+  border-radius: 8px;
+  background: #fbfcfb;
+}
+
+.enrichment-card > div:first-child {
+  min-width: 0;
+}
+
+.enrichment-card span,
+.enrichment-card small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.enrichment-card strong {
+  display: block;
+  color: #20312b;
+  font-size: 13px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.enrichment-score {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+  padding: 7px 8px;
+  border-radius: 7px;
+  background: #eef6f2;
+}
+
+.enrichment-score strong {
+  color: var(--accent-dark);
+  font-size: 18px;
+}
+
+.simple-advanced-nav {
+  grid-area: advanced;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  padding: 14px 16px;
+}
+
+.simple-advanced-nav > div:last-child {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.simple-advanced-nav button {
+  min-height: 32px;
+  padding: 5px 10px;
+  border-color: #c7d5cf;
+  background: #fff;
+  color: #253a33;
+  font-size: 12px;
+  font-weight: 750;
+}
+
 @media (max-width: 900px) {
   .topbar {
     height: auto;
@@ -3929,5 +4230,26 @@ textarea {
 
   .action-menu {
     justify-self: start;
+  }
+
+  .annotation-page {
+    padding: 14px;
+  }
+
+  .annotation-workflow {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "input"
+      "annotations"
+      "enrichment"
+      "advanced";
+  }
+
+  .simple-advanced-nav {
+    display: grid;
+  }
+
+  .simple-advanced-nav > div:last-child {
+    justify-content: flex-start;
   }
 }

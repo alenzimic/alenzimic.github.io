@@ -41,6 +41,7 @@ const state = {
   discoverStatus: "",
   annotationInput: "",
   annotationResults: [],
+  annotationEnrichment: [],
   annotationStatus: "",
   focusedRelationId: "",
   listPage: 0,
@@ -321,6 +322,8 @@ function installGlobalHandlers() {
     if (action === "find-paths") runPathSearch();
     if (action === "find-hypotheses") runHypothesisSearch();
     if (action === "annotate-entities") runAnnotationLookup();
+    if (action === "download-annotations") exportAnnotationTable();
+    if (action === "download-enrichment") exportEnrichmentTable();
     if (action === "set-annotation-example") setAnnotationExample(actionTarget.getAttribute("data-example") || "");
     if (action === "set-entity-type") {
       state.entityType = actionTarget.getAttribute("data-value") || "all";
@@ -462,6 +465,7 @@ function buildIndexes(data) {
 
 function render() {
   if (!state.data) return;
+  document.body.dataset.tab = state.tab;
   if (state.tab === "entities" && state.entityScope === "all" && !state.globalPathIndex && !state.globalPathLoading) {
     loadGlobalPathIndex().then(render).catch((error) => {
       console.error(error);
@@ -2815,6 +2819,9 @@ function geneProteinOntologyIds(entity) {
   asArray(profile.family_ids).forEach((item) => {
     if (item?.ontology_id) ids.push(item.ontology_id);
   });
+  asArray(profile.database_ids).forEach((item) => {
+    if (item?.ontology_id) ids.push(item.ontology_id);
+  });
   return uniqueStrings(ids);
 }
 
@@ -2825,6 +2832,8 @@ function geneProteinOntologyLabel(entity) {
   if (phytozome?.gene_id) return `Phytozome:${phytozome.gene_id}`;
   const family = asArray(profile.family_ids)[0];
   if (family?.ontology_id) return family.ontology_id;
+  const databaseId = asArray(profile.database_ids)[0];
+  if (databaseId?.ontology_id) return databaseId.ontology_id;
   const accession = asArray(profile.fasta_accessions)[0]?.accession || "";
   return accession ? `UniProt:${accession}` : "";
 }
@@ -2839,6 +2848,7 @@ function geneProteinSearchText(entity) {
     JSON.stringify(profile.fasta_accessions || {}),
     JSON.stringify(profile.phytozome_ids || {}),
     JSON.stringify(profile.family_ids || {}),
+    JSON.stringify(profile.database_ids || {}),
     asArray(profile.rows).map((row) => [
       row.gene_query,
       row.lookup_query,
@@ -2849,6 +2859,7 @@ function geneProteinSearchText(entity) {
       row.ambiguity_reason,
       JSON.stringify(row.phytozome || {}),
       JSON.stringify(row.family || {}),
+      JSON.stringify(row.database_ids || {}),
       JSON.stringify(row.raw_fields || {})
     ].join(" ")).join(" ")
   ].join(" ");
@@ -2861,11 +2872,12 @@ function geneProteinLine(entity) {
   const selected = best.selected || {};
   const phytozome = { ...(asArray(profile.phytozome_ids)[0] || {}), ...(best.phytozome || {}) };
   const family = { ...(asArray(profile.family_ids)[0] || {}), ...(best.family || {}) };
+  const databaseId = asArray(profile.database_ids)[0] || {};
   const representative = best.representative || {};
   const accession = selected.uniprot_accession || representative.uniprot_accession || "";
-  const gene = selected.gene_name || phytozome.gene_id || family.alias || best.gene_query || "";
+  const gene = selected.gene_name || phytozome.gene_id || databaseId.identifier || family.alias || best.gene_query || "";
   const scope = best.normalization_scope || best.decision || "";
-  return [accession || phytozome.ontology_id || family.ontology_id, gene, clean(scope)].filter(Boolean).slice(0, 3).join(" | ");
+  return [accession || phytozome.ontology_id || family.ontology_id || databaseId.ontology_id, gene, clean(scope)].filter(Boolean).slice(0, 3).join(" | ");
 }
 
 function geneProteinVisualLine(entity) {
@@ -2895,11 +2907,13 @@ function geneProteinProfile(entity) {
   const accessionCount = asArray(profile.fasta_accessions).length;
   const phytozomeCount = asArray(profile.phytozome_ids).length;
   const familyCount = asArray(profile.family_ids).length;
+  const databaseIdCount = asArray(profile.database_ids).length;
+  const databaseId = asArray(profile.database_ids)[0] || {};
   return `
     <div class="gene-protein-summary">
       <div class="taxonomy-card primary">
         <span>Gene/protein normalization</span>
-        <strong>${esc(selected.uniprot_accession || representative.uniprot_accession || phytozome.gene_id || family.ontology_id || best.decision || "unresolved")}</strong>
+        <strong>${esc(selected.uniprot_accession || representative.uniprot_accession || phytozome.gene_id || family.ontology_id || databaseId.ontology_id || best.decision || "unresolved")}</strong>
         <small>${esc([selected.gene_name || phytozome.base_gene_id || family.alias || best.gene_query, selected.protein_name || family.name, selected.organism || representative.organism || phytozome.code || family.database].filter(Boolean).join(" | ") || best.status || "")}</small>
       </div>
       ${phytozome.gene_id ? `
@@ -2930,7 +2944,7 @@ function geneProteinProfile(entity) {
     <details class="gene-protein-details" open>
       <summary>
         <span>Gene/protein ontology metadata</span>
-        <small>${fmt(profile.row_count || 0)} rows | ${fmt(accessionCount)} UniProt | ${fmt(phytozomeCount)} Phytozome | ${fmt(familyCount)} family/domain</small>
+        <small>${fmt(profile.row_count || 0)} rows | ${fmt(accessionCount)} UniProt | ${fmt(phytozomeCount)} Phytozome | ${fmt(familyCount)} family/domain | ${fmt(databaseIdCount)} database IDs</small>
       </summary>
       <div class="metadata-groups">
         ${metadataGroup("Selected UniProt", [
@@ -2974,6 +2988,10 @@ function geneProteinProfile(entity) {
           ["resource_url", family.resource_url],
           ["source_database", family.source_database]
         ]) : ""}
+        ${databaseIdCount ? metadataGroup("Additional Gene Identifiers", asArray(profile.database_ids).slice(0, 18).map((item) => [
+          item.ontology_id || item.identifier,
+          [item.database, item.source_field, item.resource_url].filter(Boolean).join(" | ")
+        ])) : ""}
         ${metadataGroup("Representative UniProt", [
           ["representative_uniprot_accession", representative.uniprot_accession],
           ["representative_uniprot_entry", representative.uniprot_entry],
@@ -3027,12 +3045,18 @@ function geneProteinExplorer(entity) {
   const accessions = asArray(profile.fasta_accessions);
   const phytozomeIds = asArray(profile.phytozome_ids);
   const familyIds = asArray(profile.family_ids);
+  const databaseIds = asArray(profile.database_ids);
   return `
     <div class="section-card fasta-panel">
       <div class="section-header">
         <h2>Sequence And Ontology IDs</h2>
-        <span class="muted">${fmt(accessions.length)} UniProt | ${fmt(phytozomeIds.length)} Phytozome | ${fmt(familyIds.length)} family/domain</span>
+        <span class="muted">${fmt(accessions.length)} UniProt | ${fmt(phytozomeIds.length)} Phytozome | ${fmt(familyIds.length)} family/domain | ${fmt(databaseIds.length)} database IDs</span>
       </div>
+      ${databaseIds.length ? `
+        <div class="fasta-list">
+          ${databaseIds.map(geneDatabaseIdCard).join("")}
+        </div>
+      ` : ""}
       ${familyIds.length ? `
         <div class="fasta-list">
           ${familyIds.map(familyOntologyCard).join("")}
@@ -3053,6 +3077,20 @@ function geneProteinExplorer(entity) {
         </div>
       `}
     </div>
+  `;
+}
+
+function geneDatabaseIdCard(item) {
+  return `
+    <article class="fasta-card family-card">
+      <div>
+        <strong>${esc(item.ontology_id || item.identifier || "Gene identifier")}</strong>
+        <span>${esc([item.database, item.source_field].filter(Boolean).join(" | "))}</span>
+      </div>
+      <div class="click-row">
+        ${item.resource_url ? `<a class="mini-link" href="${esc(item.resource_url)}" target="_blank" rel="noreferrer">Open</a>` : ""}
+      </div>
+    </article>
   `;
 }
 
@@ -3188,34 +3226,247 @@ function compoundStaticProperties(entity) {
 }
 
 function renderDiscoverWorkbench() {
+  if (!state.globalPathIndex && !state.globalPathLoading) {
+    loadGlobalPathIndex().then(() => render()).catch((error) => {
+      state.annotationStatus = `Could not load annotation database: ${error.message}`;
+      render();
+    });
+  }
+  const ready = Boolean(state.globalPathIndex);
+  const stats = state.globalPathIndex?.stats || {};
   els.mainPanel.innerHTML = `
-    <section class="hero-card discovery-hero">
+    <section class="annotation-page">
       <div class="hero-title">
         <div>
-          <h2>Annotate Genes And Compounds</h2>
-          <p>Map a gene, protein, compound, ontology ID, or alias to PSFD records, then send useful matches to Pathfinder.</p>
+          <h2>PSFD Annotation Workspace</h2>
+          <p>Batch annotation and enrichment for genes, proteins, compounds, aliases, and ontology IDs from all PSFD papers.</p>
         </div>
-        <div>${badges(["normalized IDs", "FASTA", "compound metadata"])}</div>
+        <div>${badges(ready ? [`${fmt(stats.entities || 0)} entities`, `${fmt(stats.concepts || 0)} ontology IDs`, `${fmt(state.manifest?.papers?.length || 0)} papers`] : ["loading database"])}</div>
       </div>
-      <div class="annotation-intro">
-        <strong>Paste the entities you want to annotate.</strong>
-        <span>Results show normalized IDs, classification and sequence metadata, evidence counts, and shortcuts into Pathfinder.</span>
+
+      <div class="annotation-workflow">
+        <section class="annotation-input-panel">
+          <div class="annotation-panel-head">
+            <span>01</span>
+            <div>
+              <h3>Input list</h3>
+              <small>One query per line</small>
+            </div>
+          </div>
+          <textarea id="annotationInput" placeholder="Solyc01g102960.3.1&#10;PTI&#10;piperonylic acid&#10;CHEBI:107644">${esc(state.annotationInput)}</textarea>
+          <div class="annotation-examples">
+            ${annotationExampleButton("Tomato gene", "Solyc01g102960.3.1")}
+            ${annotationExampleButton("Immune pathway", "PTI")}
+            ${annotationExampleButton("Compound", "piperonylic acid")}
+            ${annotationExampleButton("Mixed list", "Solyc01g102960.3.1\nPTI\npiperonylic acid")}
+          </div>
+          <div class="annotation-actions">
+            <button class="mini-button primary-action" type="button" data-action="annotate-entities" ${ready ? "" : "disabled"}>Annotate</button>
+            <button class="mini-button" type="button" data-action="download-annotations" ${state.annotationResults.length ? "" : "disabled"}>Download annotations</button>
+            <button class="mini-button" type="button" data-action="download-enrichment" ${state.annotationEnrichment.length ? "" : "disabled"}>Download enrichment</button>
+          </div>
+          <div class="annotation-status">${esc(state.annotationStatus || (ready ? "Ready" : "Loading annotation database"))}</div>
+        </section>
+
+        <section class="annotation-output-panel">
+          <div class="annotation-panel-head">
+            <span>02</span>
+            <div>
+              <h3>Annotations</h3>
+              <small>${annotationResultSummary()}</small>
+            </div>
+          </div>
+          ${renderAnnotationResults()}
+        </section>
+
+        <section class="annotation-output-panel enrichment-panel">
+          <div class="annotation-panel-head">
+            <span>03</span>
+            <div>
+              <h3>Enrichment</h3>
+              <small>Matched set versus PSFD background</small>
+            </div>
+          </div>
+          ${renderEnrichmentPanel()}
+        </section>
+
+        <section class="simple-advanced-nav">
+          <div>
+            <h3>Evidence browser</h3>
+            <small>For deeper inspection after annotation</small>
+          </div>
+          <div>
+            <button type="button" data-tab="paths">Hypothesis routes</button>
+            <button type="button" data-tab="entities">Entities</button>
+            <button type="button" data-tab="dependencies">Dependencies</button>
+            <button type="button" data-tab="events">Events</button>
+            <button type="button" data-tab="relations">Relations</button>
+          </div>
+        </section>
       </div>
-      <div class="annotation-examples">
-        ${annotationExampleButton("Tomato gene", "Solyc01g102960.3.1")}
-        ${annotationExampleButton("Immune pathway", "PTI")}
-        ${annotationExampleButton("Compound", "piperonylic acid")}
-        ${annotationExampleButton("Mixed list", "Solyc01g102960.3.1\nPTI\npiperonylic acid")}
-      </div>
-      <div class="annotation-input-row">
-        <textarea id="annotationInput" placeholder="Example: Solyc01g102960.3.1&#10;PTI&#10;piperonylic acid&#10;CHEBI:107644">${esc(state.annotationInput)}</textarea>
-        <div class="annotation-actions">
-          <button class="mini-button primary-action" type="button" data-action="annotate-entities">Annotate genes / compounds</button>
-          <span class="muted">${esc(state.annotationStatus || "Paste one item per line, then annotate.")}</span>
-        </div>
-      </div>
-      ${renderAnnotationResults()}
     </section>
+  `;
+}
+
+function annotationResultSummary() {
+  if (!state.annotationResults.length) return "No submitted list yet";
+  const matched = annotationRows().filter((row) => row.entity).length;
+  return `${fmt(matched)} matched | ${fmt(state.annotationResults.length - matched)} unmatched`;
+}
+
+function renderAnnotationResults() {
+  if (!state.annotationResults.length) {
+    return `<div class="annotation-empty">Submit genes, proteins, compounds, aliases, or ontology IDs.</div>`;
+  }
+  const rows = annotationRows();
+  return `
+    <div class="annotation-table-wrap">
+      <table class="annotation-table">
+        <thead>
+          <tr>
+            <th>Input</th>
+            <th>Best match</th>
+            <th>Type</th>
+            <th>Annotation</th>
+            <th>Evidence</th>
+            <th>Data</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(annotationTableRow).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function annotationRows() {
+  return state.annotationResults.map((row) => {
+    const entity = row.matches[0] || null;
+    return buildAnnotationRow(row.term, entity, row.matches.length);
+  });
+}
+
+function buildAnnotationRow(term, entity, matchCount = 0) {
+  if (!entity) {
+    return {
+      term,
+      entity: null,
+      match: "",
+      type: "",
+      pmcid: "",
+      normalized: "",
+      annotation: "No PSFD match",
+      evidence: "",
+      data: "",
+      matchCount
+    };
+  }
+  const ids = uniqueStrings([entity.ontology_id, ...geneProteinOntologyIds(entity)]).filter(Boolean);
+  return {
+    term,
+    entity,
+    match: pathEntityName(entity),
+    type: clean(entity.type || entity.entity_type || "entity"),
+    pmcid: entity.pmcid || "",
+    normalized: ids.slice(0, 6).join(" | "),
+    annotation: annotationEntitySummary(entity),
+    evidence: `${fmt(entity.relation_count || 0)} relations, ${fmt(entity.event_count || 0)} events`,
+    data: annotationDataFlags(entity).join(", "),
+    matchCount
+  };
+}
+
+function annotationTableRow(row) {
+  if (!row.entity) {
+    return `
+      <tr class="unmatched">
+        <td><strong>${esc(row.term)}</strong></td>
+        <td colspan="6">No match in the current PSFD demo database.</td>
+      </tr>
+    `;
+  }
+  const entity = row.entity;
+  return `
+    <tr>
+      <td><strong>${esc(row.term)}</strong>${row.matchCount > 1 ? `<small>${fmt(row.matchCount)} matches</small>` : ""}</td>
+      <td><strong>${esc(row.match)}</strong><small>${esc(row.pmcid)}</small></td>
+      <td>${esc(row.type)}</td>
+      <td>
+        <span>${esc(row.annotation)}</span>
+        ${row.normalized ? `<small>${esc(row.normalized)}</small>` : `<small>unmapped</small>`}
+      </td>
+      <td>${esc(row.evidence)}</td>
+      <td>${esc(row.data || "-")}</td>
+      <td>
+        <div class="annotation-row-actions">
+          <button class="mini-button" type="button" data-action="path-start" data-id="${esc(entity.id)}">Start</button>
+          <button class="mini-button" type="button" data-action="path-end" data-id="${esc(entity.id)}">End</button>
+          <button class="mini-button" type="button" data-action="select-global" data-kind="entity" data-id="${esc(entity.id)}" data-pmcid="${esc(entity.pmcid)}">Open</button>
+        </div>
+      </td>
+    </tr>
+  `;
+}
+
+function annotationEntitySummary(entity) {
+  const compound = entity.compound_classification || {};
+  const cf = compound.classyfire || {};
+  const np = compound.npclassifier || {};
+  if (np.class || np.superclass || np.pathway) return [np.pathway, np.superclass, np.class].filter(Boolean).slice(0, 3).join(" | ");
+  if (cf.class || cf.superclass) return [cf.superclass, cf.class, cf.direct_parent].filter(Boolean).slice(0, 3).join(" | ");
+  const profile = entity.gene_protein_normalization || {};
+  const family = asArray(profile.family_ids)[0] || {};
+  if (family.name || family.ontology_id) return [family.name, family.ontology_id].filter(Boolean).join(" | ");
+  const phytozome = asArray(profile.phytozome_ids)[0] || {};
+  if (phytozome.gene_id) return [phytozome.gene_id, phytozome.route_label || phytozome.code].filter(Boolean).join(" | ");
+  const accession = asArray(profile.fasta_accessions)[0] || {};
+  if (accession.accession) return [accession.accession, accession.gene_name, accession.protein_name].filter(Boolean).join(" | ");
+  const databaseId = asArray(profile.database_ids)[0] || {};
+  if (databaseId.ontology_id) return [databaseId.ontology_id, databaseId.database].filter(Boolean).join(" | ");
+  return entity.selected_label || entity.normalized_label || clean(entity.type || entity.entity_type || "entity");
+}
+
+function annotationDataFlags(entity) {
+  const flags = [];
+  const profile = entity.gene_protein_normalization || {};
+  const compound = entity.compound_classification || {};
+  if (asArray(profile.fasta_accessions).length || asArray(profile.phytozome_ids).some((item) => item.sequence)) flags.push("FASTA");
+  if (asArray(profile.database_ids).length) flags.push("gene IDs");
+  if (asArray(profile.family_ids).length) flags.push("family/domain");
+  if (compound.classification_status) flags.push("compound class");
+  if ((compound.pubchem || {}).cid) flags.push("PubChem");
+  if ((compound.chebi || {}).id) flags.push("ChEBI");
+  return uniqueStrings(flags);
+}
+
+function renderEnrichmentPanel() {
+  if (!state.annotationResults.length) {
+    return `<div class="annotation-empty">Enrichment appears after annotation.</div>`;
+  }
+  if (!annotationRows().some((row) => row.entity)) {
+    return `<div class="annotation-empty">No matched entities to enrich.</div>`;
+  }
+  if (!state.annotationEnrichment.length) {
+    return `<div class="annotation-empty">No enriched terms above the current signal threshold.</div>`;
+  }
+  return `
+    <div class="enrichment-grid">
+      ${state.annotationEnrichment.slice(0, 12).map((term) => `
+        <article class="enrichment-card">
+          <div>
+            <span>${esc(term.category)}</span>
+            <strong>${esc(term.label)}</strong>
+          </div>
+          <div class="enrichment-score">
+            <strong>${esc(formatFold(term.fold))}</strong>
+            <span>${fmt(term.selected_count)}/${fmt(term.selected_total)} matched</span>
+          </div>
+          <small>background ${fmt(term.background_count)}/${fmt(term.background_total)} | p ${esc(formatPValue(term.p_value))}</small>
+        </article>
+      `).join("")}
+    </div>
   `;
 }
 
@@ -3511,13 +3762,16 @@ async function runAnnotationLookup() {
     term,
     matches: rankedEntityMatches(term).slice(0, 5)
   }));
-  state.annotationStatus = terms.length ? `${fmt(terms.length)} query terms annotated.` : "Paste at least one entity name or ontology ID.";
+  state.annotationEnrichment = computeAnnotationEnrichment();
+  const matched = state.annotationResults.filter((row) => row.matches.length).length;
+  state.annotationStatus = terms.length ? `${fmt(matched)} of ${fmt(terms.length)} queries matched.` : "Paste at least one entity name or ontology ID.";
   render();
 }
 
 async function setAnnotationExample(value) {
   state.annotationInput = value;
   state.annotationResults = [];
+  state.annotationEnrichment = [];
   state.annotationStatus = "";
   await runAnnotationLookup();
 }
@@ -3529,13 +3783,17 @@ function rankedEntityMatches(term) {
     .map((entity) => {
       const name = pathEntityName(entity).toLowerCase();
       const ontology = String(entity.ontology_id || "").toLowerCase();
+      const ontologyIds = asArray(entity.ontology_ids).map((id) => String(id || "").toLowerCase());
+      const ontologyLocalIds = ontologyIds.map((id) => id.includes(":") ? id.split(":").slice(1).join(":") : id);
       const selected = String(entity.selected_label || "").toLowerCase();
       const search = globalEntitySearchText(entity);
       let score = 0;
       if (ontology === query) score += 120;
+      if (ontologyIds.includes(query)) score += 120;
+      if (ontologyLocalIds.includes(query)) score += 110;
       if (name === query || selected === query) score += 100;
       if (name.includes(query) || selected.includes(query)) score += 50;
-      if (search.includes(query)) score += 20;
+      if (search.includes(query)) score += 30;
       score += Math.min(20, entityEvidenceWeight(entity));
       return { entity, score };
     })
@@ -3544,23 +3802,210 @@ function rankedEntityMatches(term) {
     .map((item) => item.entity);
 }
 
-function renderAnnotationResults() {
-  if (!state.annotationResults.length) return "";
-  return `
-    <div class="annotation-results">
-      ${state.annotationResults.map((row) => `
-        <article class="annotation-card">
-          <div class="annotation-query">
-            <strong>${esc(row.term)}</strong>
-            <span>${fmt(row.matches.length)} matches</span>
-          </div>
-          <div class="annotation-matches">
-            ${row.matches.length ? row.matches.map((entity, index) => annotationMatchCard(entity, index)).join("") : `<div class="compact-card muted">No match found in the demo dataset. Try a canonical gene ID, compound name, or ontology ID.</div>`}
-          </div>
-        </article>
-      `).join("")}
-    </div>
-  `;
+function computeAnnotationEnrichment() {
+  if (!state.globalPathIndex || !state.annotationResults.length) return [];
+  const selected = uniqueEntities(state.annotationResults.map((row) => row.matches[0]).filter(Boolean));
+  if (!selected.length) return [];
+  const background = state.globalPathIndex.entities;
+  const selectedCounts = termCountsForEntities(selected);
+  const backgroundCounts = termCountsForEntities(background);
+  const selectedTotal = selected.length;
+  const backgroundTotal = background.length;
+  return Array.from(selectedCounts.values())
+    .map((term) => {
+      const backgroundTerm = backgroundCounts.get(term.key);
+      const backgroundCount = backgroundTerm?.count || 0;
+      const selectedRate = term.count / Math.max(1, selectedTotal);
+      const backgroundRate = backgroundCount / Math.max(1, backgroundTotal);
+      const fold = backgroundRate ? selectedRate / backgroundRate : Infinity;
+      return {
+        key: term.key,
+        category: term.category,
+        label: term.label,
+        selected_count: term.count,
+        selected_total: selectedTotal,
+        background_count: backgroundCount,
+        background_total: backgroundTotal,
+        fold,
+        p_value: hypergeometricPValue(term.count, backgroundCount, backgroundTotal, selectedTotal)
+      };
+    })
+    .filter((term) => term.background_count > 0 && term.fold >= 1.15)
+    .sort((a, b) => a.p_value - b.p_value || b.fold - a.fold || b.selected_count - a.selected_count || a.label.localeCompare(b.label))
+    .slice(0, 40);
+}
+
+function uniqueEntities(entities) {
+  const seen = new Set();
+  return entities.filter((entity) => {
+    const id = entity?.id || "";
+    if (!id || seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+}
+
+function termCountsForEntities(entities) {
+  const counts = new Map();
+  entities.forEach((entity) => {
+    const seen = new Set();
+    entityEnrichmentTerms(entity).forEach((term) => {
+      if (!term.key || seen.has(term.key)) return;
+      seen.add(term.key);
+      if (!counts.has(term.key)) counts.set(term.key, { ...term, count: 0 });
+      counts.get(term.key).count += 1;
+    });
+  });
+  return counts;
+}
+
+function entityEnrichmentTerms(entity) {
+  const terms = [];
+  function add(category, label) {
+    const cleaned = String(label || "").replace(/\s+/g, " ").trim();
+    if (!cleaned || cleaned === "-") return;
+    const key = `${category}::${cleaned}`.toLowerCase();
+    terms.push({ key, category, label: cleaned });
+  }
+
+  add("Entity type", clean(entity.type || entity.entity_type || "entity"));
+  const ontologyIds = uniqueStrings([entity.ontology_id, ...asArray(entity.ontology_ids), ...geneProteinOntologyIds(entity)]).filter(Boolean);
+  ontologyIds.forEach((id) => add("Ontology source", ontologySourceLabel(id)));
+
+  const profile = entity.gene_protein_normalization || {};
+  const best = profile.best || {};
+  if (profile.row_count) add("Normalization scope", clean(best.normalization_scope || best.decision || ""));
+  asArray(profile.fasta_accessions).forEach(() => add("Gene database", "UniProt"));
+  asArray(profile.phytozome_ids).forEach(() => add("Gene database", "Phytozome"));
+  asArray(profile.database_ids).forEach((item) => add("Gene database", item.database));
+  asArray(profile.family_ids).forEach((family) => {
+    add("Gene family/domain", family.name || family.alias || family.ontology_id);
+    add("Gene family database", family.database);
+  });
+
+  const compound = entity.compound_classification || {};
+  const cf = compound.classyfire || {};
+  const np = compound.npclassifier || {};
+  add("NPClassifier pathway", np.pathway);
+  add("Compound superclass", np.superclass || cf.superclass);
+  add("Compound class", np.class || cf.class || cf.direct_parent);
+
+  const relations = state.globalPathIndexes?.relationsByEntity?.get(entity.id) || [];
+  relations.forEach((rel) => {
+    add("Relation class", clean(rel.predicate_class || rel.predicate || ""));
+  });
+  const events = state.globalPathIndexes?.eventsByEntity?.get(entity.id) || [];
+  events.forEach((event) => {
+    add("Event type", clean(event.type || ""));
+  });
+  return terms;
+}
+
+function ontologySourceLabel(ontologyId) {
+  const prefix = String(ontologyId || "").split(":", 1)[0];
+  const labels = {
+    UniProt: "UniProt",
+    Phytozome: "Phytozome",
+    PhytozomeBase: "Phytozome",
+    InterPro: "InterPro",
+    Pfam: "Pfam",
+    RefSeq: "RefSeq",
+    NCBIGene: "NCBI Gene",
+    EnsemblPlants: "Ensembl Plants",
+    Gramene: "Gramene",
+    TAIR: "TAIR",
+    CHEBI: "ChEBI",
+    ChEBI: "ChEBI",
+    PubChem: "PubChem"
+  };
+  return labels[prefix] || prefix || "unmapped";
+}
+
+function hypergeometricPValue(k, K, N, n) {
+  k = Math.max(0, Number(k || 0));
+  K = Math.max(0, Number(K || 0));
+  N = Math.max(0, Number(N || 0));
+  n = Math.max(0, Number(n || 0));
+  if (!k || !K || !N || !n) return 1;
+  const max = Math.min(K, n);
+  const logDenominator = logChoose(N, n);
+  const logs = [];
+  for (let i = k; i <= max; i += 1) {
+    if (n - i > N - K) continue;
+    logs.push(logChoose(K, i) + logChoose(N - K, n - i) - logDenominator);
+  }
+  return Math.min(1, Math.exp(logSumExp(logs)));
+}
+
+function logChoose(n, k) {
+  if (k < 0 || k > n) return -Infinity;
+  k = Math.min(k, n - k);
+  let sum = 0;
+  for (let i = 1; i <= k; i += 1) {
+    sum += Math.log(n - k + i) - Math.log(i);
+  }
+  return sum;
+}
+
+function logSumExp(values) {
+  if (!values.length) return -Infinity;
+  const max = Math.max(...values);
+  return max + Math.log(values.reduce((sum, value) => sum + Math.exp(value - max), 0));
+}
+
+function formatFold(value) {
+  if (!Number.isFinite(value)) return "inf";
+  return `${value.toFixed(value >= 10 ? 0 : 1)}x`;
+}
+
+function formatPValue(value) {
+  if (!Number.isFinite(value)) return "-";
+  if (value < 0.001) return value.toExponential(1);
+  return value.toFixed(3);
+}
+
+function exportAnnotationTable() {
+  const rows = annotationRows();
+  if (!rows.length) return;
+  const header = ["input", "best_match", "type", "paper", "normalized_ids", "annotation", "evidence", "data", "match_count"];
+  const body = rows.map((row) => [
+    row.term,
+    row.match,
+    row.type,
+    row.pmcid,
+    row.normalized,
+    row.annotation,
+    row.evidence,
+    row.data,
+    row.matchCount
+  ]);
+  downloadCsv("psfd_annotations.csv", [header, ...body]);
+}
+
+function exportEnrichmentTable() {
+  if (!state.annotationEnrichment.length) return;
+  const header = ["category", "term", "selected_count", "selected_total", "background_count", "background_total", "fold_enrichment", "p_value"];
+  const body = state.annotationEnrichment.map((term) => [
+    term.category,
+    term.label,
+    term.selected_count,
+    term.selected_total,
+    term.background_count,
+    term.background_total,
+    Number.isFinite(term.fold) ? term.fold.toFixed(4) : "Infinity",
+    term.p_value
+  ]);
+  downloadCsv("psfd_enrichment.csv", [header, ...body]);
+}
+
+function downloadCsv(filename, rows) {
+  const content = `${rows.map((row) => row.map(csvCell).join(",")).join("\n")}\n`;
+  downloadFile(filename, content, "text/csv");
+}
+
+function csvCell(value) {
+  const text = String(value ?? "");
+  return `"${text.replaceAll('"', '""')}"`;
 }
 
 function annotationMatchCard(entity, index = 0) {
@@ -3614,6 +4059,7 @@ function annotationGeneActions(entity, profile) {
   const phytozome = asArray(profile.phytozome_ids)[0] || {};
   const uniprot = asArray(profile.fasta_accessions)[0] || {};
   const family = asArray(profile.family_ids)[0] || {};
+  const databaseId = asArray(profile.database_ids)[0] || {};
   const pieces = [];
   if (phytozome.gene_id) {
     pieces.push(`<span class="annotation-resource">Phytozome ${esc(phytozome.gene_id)}</span>`);
@@ -3631,6 +4077,10 @@ function annotationGeneActions(entity, profile) {
     pieces.push(`<span class="annotation-resource">${esc(family.ontology_id)}</span>`);
     if (family.name) pieces.push(`<span class="annotation-resource">${esc(family.name)}</span>`);
     if (family.resource_url) pieces.push(`<a class="mini-link" href="${esc(family.resource_url)}" target="_blank" rel="noreferrer">Family/domain</a>`);
+  }
+  if (databaseId.ontology_id) {
+    pieces.push(`<span class="annotation-resource">${esc(databaseId.ontology_id)}</span>`);
+    if (databaseId.resource_url) pieces.push(`<a class="mini-link" href="${esc(databaseId.resource_url)}" target="_blank" rel="noreferrer">${esc(databaseId.database || "Database")}</a>`);
   }
   if (!pieces.length) return "";
   return `<div class="annotation-resource-row">${pieces.join("")}</div>`;
@@ -3658,7 +4108,8 @@ function entityResearchLine(entity) {
   const geneIds = asArray(entity.gene_protein_normalization?.phytozome_ids).map((item) => item.gene_id).filter(Boolean);
   const fastaIds = asArray(entity.gene_protein_normalization?.fasta_accessions).map((item) => item.accession).filter(Boolean);
   const familyIds = asArray(entity.gene_protein_normalization?.family_ids).map((item) => item.ontology_id).filter(Boolean);
-  details.push(...geneIds.slice(0, 1), ...fastaIds.slice(0, 1), ...familyIds.slice(0, 1));
+  const databaseIds = asArray(entity.gene_protein_normalization?.database_ids).map((item) => item.ontology_id).filter(Boolean);
+  details.push(...geneIds.slice(0, 1), ...fastaIds.slice(0, 1), ...familyIds.slice(0, 1), ...databaseIds.slice(0, 1));
   details.push(`${fmt(entity.relation_count || 0)} relations`, `${fmt(entity.event_count || 0)} events`);
   return details.filter(Boolean).join(" | ");
 }
@@ -3773,7 +4224,11 @@ function shortSlug(value) {
 }
 
 function downloadTextFile(filename, content) {
-  const blob = new Blob([content], { type: "text/markdown" });
+  downloadFile(filename, content, "text/markdown");
+}
+
+function downloadFile(filename, content, type = "text/plain") {
+  const blob = new Blob([content], { type });
   const blobUrl = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = blobUrl;
@@ -3918,12 +4373,29 @@ async function loadGlobalPathIndex() {
 }
 
 function buildGlobalPathIndexes(payload) {
+  const relationsByEntity = new Map();
+  const eventsByEntity = new Map();
+  function push(map, key, value) {
+    if (!key) return;
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(value);
+  }
+  payload.relations.forEach((relation) => {
+    push(relationsByEntity, relation.subject_entity_id, relation);
+    push(relationsByEntity, relation.object_entity_id, relation);
+    asArray(relation.context_entity_ids).forEach((id) => push(relationsByEntity, id, relation));
+  });
+  payload.events.forEach((event) => {
+    asArray(event.participant_entity_ids).forEach((id) => push(eventsByEntity, id, event));
+  });
   return {
     entityById: new Map(payload.entities.map((item) => [item.id, item])),
     conceptById: new Map(payload.concepts.map((item) => [item.id, item])),
     eventById: new Map(payload.events.map((item) => [item.id, item])),
     relationById: new Map(payload.relations.map((item) => [item.id, item])),
-    dependencyById: new Map(payload.dependencies.map((item) => [item.id, item]))
+    dependencyById: new Map(payload.dependencies.map((item) => [item.id, item])),
+    relationsByEntity,
+    eventsByEntity
   };
 }
 
