@@ -4469,9 +4469,15 @@ body[data-tab="discover"] .main-panel {
   line-height: 1.35;
 }
 
+.annotation-mechanism-row .annotation-mechanism-source {
+  color: color-mix(in srgb, var(--entity-color, var(--accent)) 68%, #53665f);
+  font-size: 10.5px;
+  font-weight: 750;
+}
+
 .annotation-mechanism-row small {
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 4;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }

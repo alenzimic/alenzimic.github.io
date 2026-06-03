@@ -297,25 +297,13 @@ function installGlobalHandlers() {
     if (!actionTarget) return;
     const action = actionTarget.getAttribute("data-action");
     const id = actionTarget.getAttribute("data-id") || "";
-    if (action === "select-dependency") {
-      selectItem("dependency", id);
-      closeEntityModal();
-    }
-    if (action === "select-event") {
-      selectItem("event", id);
-      closeEntityModal();
-    }
-    if (action === "select-relation") {
-      selectItem("relation", id);
-      closeEntityModal();
-    }
+    if (action === "select-dependency") return navigateLocalItem("dependency", id);
+    if (action === "select-event") return navigateLocalItem("event", id);
+    if (action === "select-relation") return navigateLocalItem("relation", id);
     if (action === "focus-relation-context") {
       updateRelationContextFocus(id, actionTarget.closest("[data-relation-event-id]")?.getAttribute("data-relation-event-id") || "");
     }
-    if (action === "select-entity") {
-      selectItem("entity", id);
-      closeEntityModal();
-    }
+    if (action === "select-entity") return navigateLocalItem("entity", id);
     if (action === "open-entity") openEntityModal(id);
     if (action === "show-participants") {
       openParticipantGroupModal(id, actionTarget.getAttribute("data-group") || "");
@@ -337,7 +325,7 @@ function installGlobalHandlers() {
     }
     if (action === "export-hypothesis") exportHypothesisReport(Number(actionTarget.getAttribute("data-index") || 0));
     if (action === "select-global") {
-      selectGlobalItem(
+      return selectGlobalItem(
         actionTarget.getAttribute("data-kind") || "",
         id,
         actionTarget.getAttribute("data-pmcid") || ""
@@ -803,6 +791,57 @@ function selectItem(kind, id, doRender = true) {
   state.selectedKind = kind;
   state.selectedId = id;
   if (doRender) render();
+}
+
+function navigateLocalItem(kind, id, doRender = true) {
+  if (!kind || !id) return;
+  const tab = tabForKind(kind);
+  if (tab) state.tab = tab;
+  clearBrowserSearch();
+  exposeSelectionInFilters(kind, id);
+  selectItem(kind, id, false);
+  closeEntityModal();
+  if (doRender) {
+    render();
+    if (typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(() => {
+        els.mainPanel?.scrollIntoView({ block: "start", behavior: "smooth" });
+      });
+    }
+  }
+}
+
+function tabForKind(kind) {
+  const tabs = {
+    dependency: "dependencies",
+    event: "events",
+    relation: "relations",
+    entity: "entities",
+  };
+  return tabs[kind] || "";
+}
+
+function clearBrowserSearch() {
+  state.query = "";
+  if (els.searchInput) els.searchInput.value = "";
+}
+
+function exposeSelectionInFilters(kind, id) {
+  if (kind === "dependency") {
+    const dep = state.indexes?.dependencyById?.get(id);
+    if (dep?.tier === "accepted") state.includeAccepted = true;
+    if (dep?.tier === "review") state.includeReview = true;
+    if (dep?.tier === "rejected") state.includeRejected = true;
+    if (dep?.dependency_type === "shared_context") state.showSharedContext = true;
+  }
+  if (kind === "event") state.orphanOnly = false;
+  if (kind === "relation") state.relationClass = "all";
+  if (kind === "entity") {
+    state.entityScope = "paper";
+    state.entityType = "all";
+    state.normalizedOnly = false;
+  }
+  state.listPage = 0;
 }
 
 function renderList(items) {
@@ -3265,13 +3304,6 @@ function renderDiscoverWorkbench() {
             </div>
           </div>
           <textarea id="annotationInput" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Solyc01g102960.3.1&#10;PTI&#10;piperonylic acid&#10;CHEBI:107644">${esc(state.annotationInput)}</textarea>
-          <div class="annotation-category-control">
-            <label for="annotationCategory">Category</label>
-            <select id="annotationCategory">
-              ${annotationCategoryOptions()}
-            </select>
-            <small>${esc(annotationCategoryHelpText())}</small>
-          </div>
           <div class="annotation-examples">
             ${annotationExampleButton("Tomato gene", "Solyc01g102960.3.1")}
             ${annotationExampleButton("Immune pathway", "PTI")}
@@ -3479,6 +3511,7 @@ function annotationMechanismPanel(mechanisms) {
                 <strong>${esc(mechanism.statement)}</strong>
               </div>
               <p>${esc(mechanism.contextSummary || "No explicit study context was attached to this relation.")}</p>
+              <p class="annotation-mechanism-source">${esc(mechanism.provenance)}</p>
               ${mechanism.evidence ? `<small>${esc(mechanism.evidence)}</small>` : ""}
             </button>
           `).join("")}
@@ -3500,7 +3533,7 @@ function annotationContextPanel(contexts) {
         ${contexts.slice(0, 10).map((context) => `
           <button class="annotation-context-chip" type="button" data-action="select-global" data-kind="entity" data-id="${esc(context.id)}" data-pmcid="${esc(context.pmcid)}" style="--entity-color:${esc(context.color)}">
             <strong>${esc(context.label)}</strong>
-            <span>${esc(context.type)} | ${fmt(context.count)}</span>
+            <span>${esc([context.ontologyLabel || context.ontologyId, context.type, fmt(context.count)].filter(Boolean).join(" | "))}</span>
           </button>
         `).join("")}
       </div>
@@ -3868,17 +3901,21 @@ function annotationMechanismRowsForEntities(entities, relations) {
       const predicate = clean(rel.predicate || rel.predicate_class || "relates to");
       const other = selectedIsSubject && !selectedIsObject ? object : selectedIsObject && !selectedIsSubject ? subject : object || subject;
       const contexts = annotationSortedContexts(annotationRelationContextEntities(rel));
-      const evidence = shortText(rel.evidence_preview || asArray(rel.evidence_sentence_ids)[0] || "", 220);
+      const evidenceId = asArray(rel.evidence_sentence_ids)[0] || "";
+      const evidence = shortText(rel.evidence_preview || evidenceId || "", 360);
       const kind = annotationMechanismKind(rel, other);
+      const triple = rel.triple || `${subjectLabel} ${predicate} ${objectLabel}`;
       return {
         id: rel.id,
         pmcid: rel.pmcid,
         kind,
         rank: annotationMechanismRank(kind),
-        statement: shortText(`${subjectLabel} ${predicate} ${objectLabel}`, 150),
+        statement: shortText(`${subjectLabel} ${predicate} ${objectLabel}`, 170),
+        triple,
         contextSummary: contexts.length
           ? `Context: ${contexts.slice(0, 4).map((context) => context.label).join(", ")}${contexts.length > 4 ? `, +${fmt(contexts.length - 4)} more` : ""}`
           : "",
+        provenance: [`Triple: ${triple}`, rel.pmcid, evidenceId].filter(Boolean).join(" | "),
         evidence,
         color: colorForEntity(other?.type || other?.entity_type || entities[0]?.type || entities[0]?.entity_type),
       };
@@ -4000,6 +4037,8 @@ function annotationRelationContextEntities(rel) {
       pmcid: entity.pmcid,
       label: pathEntityName(entity),
       type: clean(entity.type || entity.entity_type || "context"),
+      ontologyId: annotationOntologyIds(entity)[0] || "",
+      ontologyLabel: entity.selected_label || "",
       color: colorForEntity(entity.type || entity.entity_type),
     }));
 }
@@ -6027,26 +6066,11 @@ function globalEntitySearchText(entity) {
 
 async function selectGlobalItem(kind, id, pmcid) {
   if (!kind || !id) return;
-  const tabByKind = {
-    entity: "entities",
-    event: "events",
-    relation: "relations",
-    dependency: "dependencies"
-  };
   closeEntityModal();
   if (pmcid && pmcid !== state.paper) {
     await loadPaper(pmcid, { preservePath: true });
   }
-  state.query = "";
-  if (els.searchInput) els.searchInput.value = "";
-  state.tab = tabByKind[kind] || state.tab;
-  selectItem(kind, id, false);
-  render();
-  if (typeof requestAnimationFrame === "function") {
-    requestAnimationFrame(() => {
-      els.mainPanel?.scrollIntoView({ block: "start", behavior: "smooth" });
-    });
-  }
+  navigateLocalItem(kind, id);
 }
 
 function renderInspector() {
