@@ -53,6 +53,8 @@ const state = {
   indexes: null
 };
 
+let annotationDebounceTimer = null;
+
 const els = {
   buildText: document.getElementById("buildText"),
   paperSelect: document.getElementById("paperSelect"),
@@ -242,7 +244,10 @@ function installGlobalHandlers() {
     if (target.id === "discoverStartInput") state.discoverStart = target.value;
     if (target.id === "discoverEndInput") state.discoverEnd = target.value;
     if (target.id === "discoverMaxEdges") state.discoverMaxEdges = Number(target.value || 5);
-    if (target.id === "annotationInput") state.annotationInput = target.value;
+    if (target.id === "annotationInput") {
+      state.annotationInput = target.value;
+      scheduleAnnotationLookup();
+    }
   });
 
   document.body.addEventListener("change", (event) => {
@@ -3265,7 +3270,7 @@ function renderDiscoverWorkbench() {
             <button class="mini-button" type="button" data-action="download-annotations" ${state.annotationResults.length ? "" : "disabled"}>Download annotations</button>
             <button class="mini-button" type="button" data-action="download-enrichment" ${state.annotationEnrichment.length ? "" : "disabled"}>Download enrichment</button>
           </div>
-          <div class="annotation-status">${esc(state.annotationStatus || (ready ? "Ready" : "Loading annotation database"))}</div>
+          <div class="annotation-status">${esc(state.annotationStatus || (ready ? "Paste or type a query. Results run automatically." : "Loading annotation database"))}</div>
         </section>
 
         <section class="annotation-output-panel">
@@ -3753,19 +3758,35 @@ function hypothesisSummary(path, analysis) {
 }
 
 async function runAnnotationLookup() {
-  await loadGlobalPathIndex();
-  const terms = uniqueStrings(String(state.annotationInput || "")
-    .split(/[\n;,]+/)
-    .map((term) => term.trim())
-    .filter(Boolean));
-  state.annotationResults = terms.map((term) => ({
-    term,
-    matches: rankedEntityMatches(term).slice(0, 5)
-  }));
-  state.annotationEnrichment = computeAnnotationEnrichment();
-  const matched = state.annotationResults.filter((row) => row.matches.length).length;
-  state.annotationStatus = terms.length ? `${fmt(matched)} of ${fmt(terms.length)} queries matched.` : "Paste at least one entity name or ontology ID.";
-  render();
+  try {
+    const liveInput = document.getElementById("annotationInput");
+    if (liveInput) state.annotationInput = liveInput.value;
+    await loadGlobalPathIndex();
+    const terms = uniqueStrings(String(state.annotationInput || "")
+      .split(/[\n;,]+/)
+      .map((term) => term.trim())
+      .filter(Boolean));
+    if (!terms.length) {
+      state.annotationResults = [];
+      state.annotationEnrichment = [];
+      state.annotationStatus = "Paste at least one entity name or ontology ID.";
+      render();
+      return;
+    }
+    state.annotationStatus = "Annotating...";
+    state.annotationResults = terms.map((term) => ({
+      term,
+      matches: rankedEntityMatches(term).slice(0, 5)
+    }));
+    state.annotationEnrichment = computeAnnotationEnrichment();
+    const matched = state.annotationResults.filter((row) => row.matches.length).length;
+    state.annotationStatus = `${fmt(matched)} of ${fmt(terms.length)} queries matched.`;
+    render();
+  } catch (error) {
+    console.error(error);
+    state.annotationStatus = `Annotation failed: ${error.message}`;
+    render();
+  }
 }
 
 async function setAnnotationExample(value) {
@@ -3774,6 +3795,14 @@ async function setAnnotationExample(value) {
   state.annotationEnrichment = [];
   state.annotationStatus = "";
   await runAnnotationLookup();
+}
+
+function scheduleAnnotationLookup() {
+  if (state.tab !== "discover") return;
+  clearTimeout(annotationDebounceTimer);
+  annotationDebounceTimer = setTimeout(() => {
+    runAnnotationLookup();
+  }, 450);
 }
 
 function rankedEntityMatches(term) {
