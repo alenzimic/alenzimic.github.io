@@ -3952,10 +3952,14 @@ body[data-tab="discover"] .main-panel {
 }
 
 .annotation-input-panel textarea {
+  position: relative;
+  z-index: 1;
   min-height: 210px;
   border-color: #b9c9c3;
   background: #fbfcfb;
   font-size: 14px;
+  pointer-events: auto;
+  user-select: text;
 }
 
 .annotation-input-panel .annotation-examples {
@@ -3964,6 +3968,13 @@ body[data-tab="discover"] .main-panel {
 
 .annotation-input-panel .annotation-actions {
   gap: 8px;
+}
+
+.annotation-input-panel button,
+.simple-advanced-nav button {
+  position: relative;
+  z-index: 1;
+  pointer-events: auto;
 }
 
 .annotation-status,

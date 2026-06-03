@@ -53,8 +53,6 @@ const state = {
   indexes: null
 };
 
-let annotationDebounceTimer = null;
-
 const els = {
   buildText: document.getElementById("buildText"),
   paperSelect: document.getElementById("paperSelect"),
@@ -244,10 +242,7 @@ function installGlobalHandlers() {
     if (target.id === "discoverStartInput") state.discoverStart = target.value;
     if (target.id === "discoverEndInput") state.discoverEnd = target.value;
     if (target.id === "discoverMaxEdges") state.discoverMaxEdges = Number(target.value || 5);
-    if (target.id === "annotationInput") {
-      state.annotationInput = target.value;
-      scheduleAnnotationLookup();
-    }
+    if (target.id === "annotationInput") state.annotationInput = target.value;
   });
 
   document.body.addEventListener("change", (event) => {
@@ -280,12 +275,14 @@ function installGlobalHandlers() {
   });
 
   document.body.addEventListener("click", (event) => {
-    const closeTarget = event.target.closest("[data-close-modal]");
+    const clicked = event.target instanceof Element ? event.target : event.target?.parentElement;
+    if (!clicked) return;
+    const closeTarget = clicked.closest("[data-close-modal]");
     if (closeTarget) {
       closeEntityModal();
       return;
     }
-    const tab = event.target.closest("[data-tab]");
+    const tab = clicked.closest("[data-tab]");
     if (tab) {
       state.tab = tab.getAttribute("data-tab");
       state.pathResults = [];
@@ -293,7 +290,7 @@ function installGlobalHandlers() {
       render();
       return;
     }
-    const actionTarget = event.target.closest("[data-action]");
+    const actionTarget = clicked.closest("[data-action]");
     if (!actionTarget) return;
     const action = actionTarget.getAttribute("data-action");
     const id = actionTarget.getAttribute("data-id") || "";
@@ -3266,11 +3263,11 @@ function renderDiscoverWorkbench() {
             ${annotationExampleButton("Mixed list", "Solyc01g102960.3.1\nPTI\npiperonylic acid")}
           </div>
           <div class="annotation-actions">
-            <button class="mini-button primary-action" type="button" data-action="annotate-entities" ${ready ? "" : "disabled"}>Annotate</button>
-            <button class="mini-button" type="button" data-action="download-annotations" ${state.annotationResults.length ? "" : "disabled"}>Download annotations</button>
-            <button class="mini-button" type="button" data-action="download-enrichment" ${state.annotationEnrichment.length ? "" : "disabled"}>Download enrichment</button>
+            <button class="mini-button primary-action" type="button" data-annotation-action="annotate">Annotate</button>
+            <button class="mini-button" type="button" data-annotation-action="download-annotations" ${state.annotationResults.length ? "" : "disabled"}>Download annotations</button>
+            <button class="mini-button" type="button" data-annotation-action="download-enrichment" ${state.annotationEnrichment.length ? "" : "disabled"}>Download enrichment</button>
           </div>
-          <div class="annotation-status">${esc(state.annotationStatus || (ready ? "Paste or type a query. Results run automatically." : "Loading annotation database"))}</div>
+          <div class="annotation-status">${esc(state.annotationStatus || (ready ? "Paste or type a query, then click Annotate." : "Loading annotation database"))}</div>
         </section>
 
         <section class="annotation-output-panel">
@@ -3301,16 +3298,17 @@ function renderDiscoverWorkbench() {
             <small>For deeper inspection after annotation</small>
           </div>
           <div>
-            <button type="button" data-tab="paths">Hypothesis routes</button>
-            <button type="button" data-tab="entities">Entities</button>
-            <button type="button" data-tab="dependencies">Dependencies</button>
-            <button type="button" data-tab="events">Events</button>
-            <button type="button" data-tab="relations">Relations</button>
+            <button type="button" data-annotation-tab="paths">Hypothesis routes</button>
+            <button type="button" data-annotation-tab="entities">Entities</button>
+            <button type="button" data-annotation-tab="dependencies">Dependencies</button>
+            <button type="button" data-annotation-tab="events">Events</button>
+            <button type="button" data-annotation-tab="relations">Relations</button>
           </div>
         </section>
       </div>
     </section>
   `;
+  bindAnnotationWorkspaceHandlers();
 }
 
 function annotationResultSummary() {
@@ -3477,10 +3475,54 @@ function renderEnrichmentPanel() {
 
 function annotationExampleButton(label, value) {
   return `
-    <button class="annotation-example" type="button" data-action="set-annotation-example" data-example="${esc(value)}">
+    <button class="annotation-example" type="button" data-annotation-example="${esc(value)}">
       ${esc(label)}
     </button>
   `;
+}
+
+function bindAnnotationWorkspaceHandlers() {
+  const input = document.getElementById("annotationInput");
+  if (input) {
+    input.addEventListener("input", () => {
+      state.annotationInput = input.value;
+    });
+    input.addEventListener("paste", () => {
+      setTimeout(() => {
+        state.annotationInput = input.value;
+      }, 0);
+    });
+  }
+
+  els.mainPanel.querySelectorAll("[data-annotation-action]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const action = button.getAttribute("data-annotation-action");
+      if (action === "annotate") runAnnotationLookup();
+      if (action === "download-annotations") exportAnnotationTable();
+      if (action === "download-enrichment") exportEnrichmentTable();
+    });
+  });
+
+  els.mainPanel.querySelectorAll("[data-annotation-example]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      setAnnotationExample(button.getAttribute("data-annotation-example") || "");
+    });
+  });
+
+  els.mainPanel.querySelectorAll("[data-annotation-tab]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      state.tab = button.getAttribute("data-annotation-tab") || state.tab;
+      state.pathResults = [];
+      state.listPage = 0;
+      render();
+    });
+  });
 }
 
 function discoveryEntityOptions() {
@@ -3795,14 +3837,6 @@ async function setAnnotationExample(value) {
   state.annotationEnrichment = [];
   state.annotationStatus = "";
   await runAnnotationLookup();
-}
-
-function scheduleAnnotationLookup() {
-  if (state.tab !== "discover") return;
-  clearTimeout(annotationDebounceTimer);
-  annotationDebounceTimer = setTimeout(() => {
-    runAnnotationLookup();
-  }, 450);
 }
 
 function rankedEntityMatches(term) {
