@@ -4178,6 +4178,8 @@ body[data-tab="discover"] .main-panel {
 
 .summary-theme-row.clickable:hover,
 .alternate-match:hover,
+.annotation-meaning-choice:hover,
+.annotation-record-chip:hover,
 .research-signal-card:hover {
   border-color: color-mix(in srgb, var(--entity-color, var(--accent)) 35%, #bed2c9);
   background: #eef7f3;
@@ -4278,6 +4280,8 @@ body[data-tab="discover"] .main-panel {
 
 .annotation-mechanism-panel,
 .annotation-trait-panel,
+.annotation-meaning-panel,
+.annotation-record-panel,
 .annotation-context-panel {
   display: grid;
   gap: 8px;
@@ -4309,6 +4313,76 @@ body[data-tab="discover"] .main-panel {
 .annotation-trait-list {
   display: grid;
   gap: 7px;
+}
+
+.annotation-meaning-grid,
+.annotation-record-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+}
+
+.annotation-meaning-choice,
+.annotation-record-chip {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid color-mix(in srgb, var(--entity-color, var(--accent)) 20%, var(--line));
+  border-left: 3px solid var(--entity-color, var(--accent));
+  border-radius: 8px;
+  background: #fbfcfb;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.annotation-meaning-choice.active,
+.annotation-record-chip.active {
+  border-color: color-mix(in srgb, var(--entity-color, var(--accent)) 54%, var(--line));
+  background: color-mix(in srgb, var(--entity-color, var(--accent)) 10%, #fff);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--entity-color, var(--accent)) 24%, transparent);
+}
+
+.annotation-record-chip.inert {
+  cursor: default;
+}
+
+.annotation-record-chip.inert:hover {
+  border-color: color-mix(in srgb, var(--entity-color, var(--accent)) 20%, var(--line));
+  background: #fbfcfb;
+}
+
+.annotation-meaning-choice strong,
+.annotation-meaning-choice span,
+.annotation-meaning-choice small,
+.annotation-record-chip strong,
+.annotation-record-chip span {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.annotation-meaning-choice strong,
+.annotation-record-chip strong {
+  color: #20312b;
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.annotation-meaning-choice span {
+  color: color-mix(in srgb, var(--entity-color, var(--accent)) 76%, #20312b);
+  font-size: 11.5px;
+  font-weight: 850;
+  line-height: 1.25;
+}
+
+.annotation-meaning-choice small,
+.annotation-record-chip span {
+  color: var(--muted);
+  font-size: 10.5px;
+  line-height: 1.3;
 }
 
 .annotation-mechanism-row {

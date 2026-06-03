@@ -45,6 +45,7 @@ const state = {
   annotationStatus: "",
   annotationEditing: false,
   annotationCategory: "auto",
+  annotationSelectionIds: {},
   focusedRelationId: "",
   listPage: 0,
   listPageSize: 12,
@@ -3353,7 +3354,8 @@ function renderAnnotationResults() {
 
 function annotationRows() {
   return state.annotationResults.map((row) => {
-    const entity = row.matches[0] || null;
+    const selectedId = state.annotationSelectionIds[row.term] || "";
+    const entity = row.matches.find((match) => match.id === selectedId) || row.matches[0] || null;
     return buildAnnotationRow(row.term, entity, row.matches.length, row.matches);
   });
 }
@@ -3374,7 +3376,7 @@ function buildAnnotationRow(term, entity, matchCount = 0, matches = []) {
       matches
     };
   }
-  const ids = uniqueStrings([entity.ontology_id, ...geneProteinOntologyIds(entity)]).filter(Boolean);
+  const ids = annotationOntologyIds(entity);
   return {
     term,
     entity,
@@ -3386,7 +3388,8 @@ function buildAnnotationRow(term, entity, matchCount = 0, matches = []) {
     evidence: `${fmt(entity.relation_count || 0)} relations, ${fmt(entity.event_count || 0)} events`,
     data: annotationDataFlags(entity).join(", "),
     matchCount,
-    matches
+    matches,
+    selectedId: entity.id,
   };
 }
 
@@ -3417,16 +3420,17 @@ function annotationSummaryCard(row) {
         </div>
         <div class="annotation-confidence">${esc(profile.status)}</div>
       </div>
+      ${annotationMeaningChooser(row)}
       ${annotationOntologyPanel(profile.ontology)}
       <p class="annotation-plain-summary">${esc(profile.summary)}</p>
       ${annotationFactStrip(profile.facts)}
+      ${annotationRecordPanel(profile.records, entity)}
       ${annotationMechanismPanel(profile.mechanisms)}
       ${annotationContextPanel(profile.contexts)}
       <div class="annotation-card-actions">
         ${profile.fastaButton || ""}
         <button class="mini-button" type="button" data-action="select-global" data-kind="entity" data-id="${esc(entity.id)}" data-pmcid="${esc(entity.pmcid)}">Inspect evidence</button>
       </div>
-      ${renderAlternateMatches(row)}
     </article>
   `;
 }
@@ -3504,6 +3508,104 @@ function annotationContextPanel(contexts) {
   `;
 }
 
+function annotationMeaningChooser(row) {
+  const choices = annotationMeaningChoices(row.matches);
+  if (choices.length <= 1) return "";
+  return `
+    <section class="annotation-meaning-panel">
+      <div class="annotation-section-head">
+        <h5>Choose meaning</h5>
+        <span>${fmt(choices.length)} categories</span>
+      </div>
+      <div class="annotation-meaning-grid">
+        ${choices.map((choice) => {
+          const active = choice.entity.id === row.selectedId;
+          return `
+            <button class="annotation-meaning-choice ${active ? "active" : ""}" type="button" data-annotation-select-match="${esc(choice.entity.id)}" data-term="${esc(row.term)}" style="--entity-color:${esc(colorForEntity(choice.entity.type || choice.entity.entity_type))}">
+              <strong>${esc(choice.category)}</strong>
+              <span>${esc(choice.label)}</span>
+              <small>${esc(choice.detail)}</small>
+            </button>
+          `;
+        }).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function annotationMeaningChoices(matches) {
+  const byCategory = new Map();
+  asArray(matches).forEach((entity) => {
+    if (!entity?.id) return;
+    const category = annotationMeaningCategory(entity);
+    if (!byCategory.has(category)) {
+      const ids = annotationOntologyIds(entity);
+      const concept = annotationConceptForIds(ids);
+      const records = annotationConceptEntities(entity, concept);
+      byCategory.set(category, {
+        category,
+        entity,
+        count: 0,
+        label: annotationMeaningLabel(entity, concept),
+        detail: annotationMeaningDetail(entity, ids, records),
+      });
+    }
+    byCategory.get(category).count += 1;
+  });
+  return Array.from(byCategory.values())
+    .map((choice) => ({
+      ...choice,
+      detail: choice.count > 1 ? `${choice.detail} | ${fmt(choice.count)} candidate matches` : choice.detail,
+    }));
+}
+
+function annotationMeaningCategory(entity) {
+  const type = String(entity.type || entity.entity_type || "").toLowerCase();
+  if (isCompoundLikeGlobalEntity(entity)) return "Compound";
+  if (type === "experimental_condition" || type === "condition_parameter") return "Condition / treatment";
+  if (type === "pathway_or_process") return "Pathway / process";
+  if (type === "gene_protein" || type === "gene" || type === "protein") return "Gene / protein";
+  if (type === "plant_trait" || type === "molecular_trait_or_function" || type === "phenotype") return "Trait / function";
+  if (type === "taxon") return "Organism";
+  if (/anatomical|cellular|developmental/.test(type)) return "Anatomy / cell";
+  if (/assay/.test(type)) return "Assay / measurement";
+  return clean(type || "entity");
+}
+
+function annotationMeaningLabel(entity, concept = null) {
+  return concept?.label || entity.selected_label || pathEntityName(entity);
+}
+
+function annotationMeaningDetail(entity, ids, records) {
+  const pieces = [];
+  if (ids[0]) pieces.push(ids[0]);
+  pieces.push(`${fmt(records.length || 1)} PSFD record${(records.length || 1) === 1 ? "" : "s"}`);
+  const papers = uniqueStrings((records.length ? records : [entity]).map((record) => record.pmcid).filter(Boolean));
+  if (papers.length) pieces.push(`${fmt(papers.length)} paper${papers.length === 1 ? "" : "s"}`);
+  return pieces.join(" | ");
+}
+
+function annotationRecordPanel(records, activeEntity) {
+  if (!records || records.length <= 1) return "";
+  return `
+    <section class="annotation-record-panel">
+      <div class="annotation-section-head">
+        <h5>Same ontology records</h5>
+        <span>${fmt(records.length)} records</span>
+      </div>
+      <div class="annotation-record-grid">
+        ${records.slice(0, 8).map((record) => `
+          <button class="annotation-record-chip ${record.id === activeEntity.id ? "active" : ""}" type="button" data-action="select-global" data-kind="entity" data-id="${esc(record.id)}" data-pmcid="${esc(record.pmcid)}" style="--entity-color:${esc(colorForEntity(record.type || record.entity_type))}">
+            <strong>${esc(pathEntityName(record))}</strong>
+            <span>${esc([record.pmcid, clean(record.type || record.entity_type || "entity")].filter(Boolean).join(" | "))}</span>
+          </button>
+        `).join("")}
+        ${records.length > 8 ? `<div class="annotation-record-chip inert"><strong>+${fmt(records.length - 8)} more</strong><span>same ontology ID</span></div>` : ""}
+      </div>
+    </section>
+  `;
+}
+
 function summaryMiniPanel(title, rows) {
   return `
     <section class="summary-mini-panel">
@@ -3569,28 +3671,80 @@ function summaryThemeRow(row) {
   return `<div class="summary-theme-row">${content}</div>`;
 }
 
+function annotationOntologyIds(entity) {
+  const compound = entity.compound_classification || {};
+  const chebi = compound.chebi || {};
+  const pubchem = compound.pubchem || {};
+  const normalization = compound.normalization || {};
+  return uniqueStrings([
+    entity.ontology_id,
+    entity.selected_ontology_id,
+    ...asArray(entity.ontology_ids),
+    normalization.selected_ontology_id,
+    chebi.id,
+    pubchem.cid ? `PubChem:${pubchem.cid}` : "",
+    ...geneProteinOntologyIds(entity),
+  ]).filter(Boolean);
+}
+
+function annotationConceptForIds(ids) {
+  const concepts = uniqueStrings(ids)
+    .map((id) => state.globalPathIndexes?.conceptById?.get(id))
+    .filter(Boolean);
+  return concepts
+    .sort((a, b) => asArray(b.entity_ids).length - asArray(a.entity_ids).length || String(a.id).localeCompare(String(b.id)))[0] || null;
+}
+
+function annotationConceptEntities(entity, concept) {
+  const byId = state.globalPathIndexes?.entityById;
+  const records = asArray(concept?.entity_ids)
+    .map((id) => byId?.get(id))
+    .filter(Boolean);
+  return uniqueEntities([entity, ...records])
+    .sort((a, b) => {
+      if (a.id === entity.id) return -1;
+      if (b.id === entity.id) return 1;
+      return String(a.pmcid || "").localeCompare(String(b.pmcid || "")) || pathEntityName(a).localeCompare(pathEntityName(b));
+    });
+}
+
+function annotationEndpointRelationsForEntities(entities) {
+  const entityIds = new Set(entities.map((entity) => entity.id).filter(Boolean));
+  const byId = new Map();
+  entities.forEach((entity) => {
+    (state.globalPathIndexes?.relationsByEntity?.get(entity.id) || []).forEach((rel) => {
+      if (entityIds.has(rel.subject_entity_id) || entityIds.has(rel.object_entity_id)) byId.set(rel.id, rel);
+    });
+  });
+  return Array.from(byId.values());
+}
+
 function annotationEntityProfile(entity) {
-  const ids = uniqueStrings([entity.ontology_id, ...asArray(entity.ontology_ids), ...geneProteinOntologyIds(entity)]).filter(Boolean);
-  const relations = state.globalPathIndexes?.relationsByEntity?.get(entity.id) || [];
-  const endpointRelations = relations.filter((rel) => relationHasEndpoint(rel, entity.id));
-  const traits = annotationTraitRows(entity, endpointRelations);
-  const mechanisms = annotationMechanismRows(entity, endpointRelations);
+  const ids = annotationOntologyIds(entity);
+  const concept = annotationConceptForIds(ids);
+  const records = annotationConceptEntities(entity, concept);
+  const endpointRelations = annotationEndpointRelationsForEntities(records);
+  const selectedRelations = (state.globalPathIndexes?.relationsByEntity?.get(entity.id) || []).filter((rel) => relationHasEndpoint(rel, entity.id));
+  const traits = annotationTraitRows(entity, selectedRelations);
+  const mechanisms = annotationMechanismRowsForEntities(records, endpointRelations);
   const contexts = annotationContextRows(endpointRelations);
-  const ontology = annotationOntologySummary(entity, ids);
+  const ontology = annotationOntologySummary(entity, ids, concept);
   const profile = entity.gene_protein_normalization || {};
   const compound = entity.compound_classification || {};
   const status = annotationStatusLabel(entity, profile, compound);
-  const evidenceCount = endpointRelations.length || relations.length || Number(entity.relation_count || 0);
+  const evidenceCount = endpointRelations.length || selectedRelations.length || Number(entity.relation_count || 0);
   return {
     status,
-    summary: annotationPlainSummary(entity, endpointRelations, mechanisms, contexts, ontology),
+    summary: annotationPlainSummary(entity, endpointRelations, mechanisms, contexts, ontology, records),
     identity: annotationIdentityRows(entity, ids),
     metadata: annotationMetadataRows(entity, profile, compound),
-    facts: annotationFactRows(entity, ids, evidenceCount, mechanisms, contexts, profile, compound),
+    facts: annotationFactRows(entity, ids, evidenceCount, mechanisms, contexts, profile, compound, records),
     ontology,
     mechanisms,
     traits,
     contexts,
+    records,
+    concept,
     fastaButton: annotationFastaButton(entity, profile),
   };
 }
@@ -3604,20 +3758,25 @@ function annotationStatusLabel(entity, profile, compound) {
   return "partial match";
 }
 
-function annotationPlainSummary(entity, relations, mechanisms, contexts, ontology) {
+function annotationPlainSummary(entity, relations, mechanisms, contexts, ontology, records = []) {
   const name = pathEntityName(entity);
   const type = clean(entity.type || entity.entity_type || "entity");
   const definition = ontology?.description || conciseEntityDefinition(entity);
   const mechanismStatements = mechanisms.slice(0, 2).map((mechanism) => mechanism.statement);
   const contextNames = contexts.slice(0, 4).map((context) => context.label);
+  const papers = uniqueStrings(records.map((record) => record.pmcid).filter(Boolean));
   const pieces = [];
+  const cleanDefinition = String(definition || "").replace(/[\s.]+$/g, "");
   if (ontology?.title) {
     pieces.push(`${name} maps to ${ontology.title}${ontology.id ? ` (${ontology.id})` : ""}`);
-    if (definition && definition.toLowerCase() !== String(ontology.title).toLowerCase()) pieces.push(definition);
-  } else if (definition) {
-    pieces.push(`${name}: ${definition}`);
+    if (cleanDefinition && cleanDefinition.toLowerCase() !== String(ontology.title).toLowerCase()) pieces.push(cleanDefinition);
+  } else if (cleanDefinition) {
+    pieces.push(`${name}: ${cleanDefinition}`);
   } else {
     pieces.push(`${name} is annotated as ${type}`);
+  }
+  if (records.length > 1 && ontology?.id) {
+    pieces.push(`This summary aggregates ${fmt(records.length)} PSFD record${records.length === 1 ? "" : "s"} from ${fmt(papers.length)} paper${papers.length === 1 ? "" : "s"} that share ${ontology.id}`);
   }
   if (mechanismStatements.length) {
     pieces.push(`The clearest PSFD evidence is ${mechanismStatements.join("; ")}`);
@@ -3625,10 +3784,10 @@ function annotationPlainSummary(entity, relations, mechanisms, contexts, ontolog
     pieces.push(`PSFD has ${fmt(relations.length)} extracted relation${relations.length === 1 ? "" : "s"}, but no direct mechanistic relation was extracted for this entity`);
   }
   if (contextNames.length) pieces.push(`Study contexts include ${contextNames.join(", ")}`);
-  return `${pieces.join(". ")}.`;
+  return `${pieces.map((piece) => String(piece).replace(/[\s.]+$/g, "")).join(". ")}.`;
 }
 
-function annotationOntologySummary(entity, ids) {
+function annotationOntologySummary(entity, ids, concept = null) {
   const profile = entity.gene_protein_normalization || {};
   const compound = entity.compound_classification || {};
   const phytozome = asArray(profile.phytozome_ids)[0] || {};
@@ -3639,6 +3798,7 @@ function annotationOntologySummary(entity, ids) {
   const pubchem = compound.pubchem || {};
   const id = ids[0] || chebi.id || (pubchem.cid ? `PubChem:${pubchem.cid}` : "") || "";
   const title = [
+    concept?.label,
     entity.selected_label,
     chebi.name,
     phytozome.gene_id,
@@ -3650,11 +3810,13 @@ function annotationOntologySummary(entity, ids) {
     entity.normalized_label,
   ].map((value) => String(value || "").trim()).find(Boolean);
   if (!id && !title && !entity.ontology) return null;
-  const selectedDescription = String(entity.selected_description || "").replace(/\s+/g, " ").trim();
+  const conceptDescription = stripInlineHtml(concept?.description);
+  const selectedDescription = stripInlineHtml(entity.selected_description);
   const fallback = conciseEntityDefinition(entity);
-  const description = selectedDescription && !looksLikeEvidenceSentence(selectedDescription)
+  const description = conceptDescription
+    || (selectedDescription && !looksLikeEvidenceSentence(selectedDescription)
     ? selectedDescription
-    : fallback;
+    : fallback);
   return {
     id,
     title: title || id || entity.ontology,
@@ -3663,9 +3825,15 @@ function annotationOntologySummary(entity, ids) {
   };
 }
 
-function annotationFactRows(entity, ids, evidenceCount, mechanisms, contexts, profile, compound) {
+function stripInlineHtml(value) {
+  return String(value || "").replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+}
+
+function annotationFactRows(entity, ids, evidenceCount, mechanisms, contexts, profile, compound, records = []) {
+  const papers = uniqueStrings(records.map((record) => record.pmcid).filter(Boolean));
   const rows = [
     ["Category", clean(entity.type || entity.entity_type || "entity")],
+    ["Same ontology records", records.length > 1 ? `${fmt(records.length)} in ${fmt(papers.length)} papers` : "1 record"],
     ["Evidence statements", fmt(mechanisms.length)],
     ["Contexts", fmt(contexts.length)],
     ["Evidence", `${fmt(evidenceCount)} relation${evidenceCount === 1 ? "" : "s"}`],
@@ -3683,17 +3851,22 @@ function annotationFactRows(entity, ids, evidenceCount, mechanisms, contexts, pr
 }
 
 function annotationMechanismRows(entity, relations) {
+  return annotationMechanismRowsForEntities([entity], relations);
+}
+
+function annotationMechanismRowsForEntities(entities, relations) {
+  const entityIds = new Set(entities.map((item) => item.id).filter(Boolean));
   return relations
     .map((rel) => {
       const subject = state.globalPathIndexes?.entityById?.get(rel.subject_entity_id);
       const object = state.globalPathIndexes?.entityById?.get(rel.object_entity_id);
-      const selectedIsSubject = rel.subject_entity_id === entity.id;
-      const selectedIsObject = rel.object_entity_id === entity.id;
+      const selectedIsSubject = entityIds.has(rel.subject_entity_id);
+      const selectedIsObject = entityIds.has(rel.object_entity_id);
       if (!selectedIsSubject && !selectedIsObject) return null;
       const subjectLabel = subject ? pathEntityName(subject) : rel.subject || "subject";
       const objectLabel = object ? pathEntityName(object) : rel.object || "object";
       const predicate = clean(rel.predicate || rel.predicate_class || "relates to");
-      const other = selectedIsSubject ? object : subject;
+      const other = selectedIsSubject && !selectedIsObject ? object : selectedIsObject && !selectedIsSubject ? subject : object || subject;
       const contexts = annotationSortedContexts(annotationRelationContextEntities(rel));
       const evidence = shortText(rel.evidence_preview || asArray(rel.evidence_sentence_ids)[0] || "", 220);
       const kind = annotationMechanismKind(rel, other);
@@ -3707,7 +3880,7 @@ function annotationMechanismRows(entity, relations) {
           ? `Context: ${contexts.slice(0, 4).map((context) => context.label).join(", ")}${contexts.length > 4 ? `, +${fmt(contexts.length - 4)} more` : ""}`
           : "",
         evidence,
-        color: colorForEntity(other?.type || other?.entity_type || entity.type || entity.entity_type),
+        color: colorForEntity(other?.type || other?.entity_type || entities[0]?.type || entities[0]?.entity_type),
       };
     })
     .filter(Boolean)
@@ -4210,6 +4383,20 @@ function bindAnnotationWorkspaceHandlers() {
     });
   });
 
+  els.mainPanel.querySelectorAll("[data-annotation-select-match]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const term = button.getAttribute("data-term") || "";
+      const id = button.getAttribute("data-annotation-select-match") || "";
+      if (!term || !id) return;
+      state.annotationSelectionIds[term] = id;
+      state.annotationEnrichment = computeAnnotationEnrichment();
+      state.annotationStatus = `Showing ${annotationMeaningCategory(state.globalPathIndexes?.entityById?.get(id) || {})} meaning for ${term}.`;
+      render();
+    });
+  });
+
   els.mainPanel.querySelectorAll("[data-annotation-tab]").forEach((button) => {
     button.addEventListener("click", (event) => {
       event.preventDefault();
@@ -4540,8 +4727,12 @@ async function runAnnotationLookup() {
     state.annotationStatus = "Annotating...";
     state.annotationResults = terms.map((term) => ({
       term,
-      matches: rankedEntityMatches(term, state.annotationCategory).slice(0, 5)
+      matches: rankedEntityMatches(term, state.annotationCategory).slice(0, 12)
     }));
+    const termSet = new Set(terms);
+    Object.keys(state.annotationSelectionIds).forEach((term) => {
+      if (!termSet.has(term)) delete state.annotationSelectionIds[term];
+    });
     state.annotationEnrichment = computeAnnotationEnrichment();
     const matched = state.annotationResults.filter((row) => row.matches.length).length;
     const category = state.annotationCategory === "auto" ? "" : ` in ${annotationCategoryLabel(state.annotationCategory)}`;
@@ -4563,6 +4754,7 @@ async function setAnnotationExample(value) {
   state.annotationInput = value;
   state.annotationResults = [];
   state.annotationEnrichment = [];
+  state.annotationSelectionIds = {};
   state.annotationStatus = "";
   await runAnnotationLookup();
 }
@@ -4600,7 +4792,7 @@ function rankedEntityMatches(term, category = "auto") {
       score += Math.min(20, entityEvidenceWeight(entity));
       return { entity, score };
     })
-    .filter((item) => item.score > 20 && entityMatchesAnnotationCategory(item.entity, category))
+    .filter((item) => item.score > (shortQuery ? 44 : 20) && entityMatchesAnnotationCategory(item.entity, category))
     .sort((a, b) => b.score - a.score || pathEntityName(a.entity).localeCompare(pathEntityName(b.entity)))
     .map((item) => item.entity);
 }
@@ -4675,7 +4867,7 @@ function textHasQueryToken(text, query) {
 
 function computeAnnotationEnrichment() {
   if (!state.globalPathIndex || !state.annotationResults.length) return [];
-  const selected = uniqueEntities(state.annotationResults.map((row) => row.matches[0]).filter(Boolean));
+  const selected = uniqueEntities(annotationRows().map((row) => row.entity).filter(Boolean));
   if (selected.length < 2) return [];
   const rows = [];
   const withTraits = [];
