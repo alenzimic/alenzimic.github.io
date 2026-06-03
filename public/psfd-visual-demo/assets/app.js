@@ -316,7 +316,7 @@ function installGlobalHandlers() {
       closeEntityModal();
       return;
     }
-    const tab = clicked.closest("[data-tab]");
+    const tab = clicked.closest("button[data-tab]");
     if (tab) {
       event.__psfdActionHandled = true;
       event.preventDefault();
@@ -454,7 +454,7 @@ function runButtonAction(action, id, actionTarget) {
       exportEnrichmentTable();
       return true;
     case "set-annotation-example":
-      setAnnotationExample(actionTarget.getAttribute("data-example") || "");
+      setAnnotationExample(actionTarget.getAttribute("data-example") || "").catch(reportButtonActionError);
       return true;
     case "set-entity-type":
       state.entityType = actionTarget.getAttribute("data-value") || "all";
@@ -637,7 +637,7 @@ function stat(value, label) {
 }
 
 function renderTabs() {
-  document.querySelectorAll("[data-tab]").forEach((button) => {
+  document.querySelectorAll("button[data-tab]").forEach((button) => {
     button.classList.toggle("active", button.getAttribute("data-tab") === state.tab);
   });
 }
@@ -3423,8 +3423,8 @@ function compoundStaticProperties(entity) {
 function renderDiscoverWorkbench() {
   if (!state.globalPathIndex && !state.globalPathLoading) {
     loadGlobalPathIndex().then(() => {
-      if (state.annotationEditing || document.activeElement?.id === "annotationInput") {
-        setAnnotationStatusText("Database ready. Click Annotate when your list is ready.");
+      if (state.tab === "discover") {
+        refreshAnnotationReadyState();
       } else {
         render();
       }
@@ -3442,7 +3442,7 @@ function renderDiscoverWorkbench() {
           <h2>PSFD Annotation Workspace</h2>
           <p>Paste genes, proteins, compounds, aliases, or ontology IDs to get concise PSFD annotations and research signals from all papers.</p>
         </div>
-        <div>${badges(ready ? [`${fmt(stats.entities || 0)} entities`, `${fmt(stats.concepts || 0)} ontology IDs`, `${fmt(state.manifest?.papers?.length || 0)} papers`] : ["loading database"])}</div>
+        <div data-annotation-stats>${badges(ready ? [`${fmt(stats.entities || 0)} entities`, `${fmt(stats.concepts || 0)} ontology IDs`, `${fmt(state.manifest?.papers?.length || 0)} papers`] : ["loading database"])}</div>
       </div>
 
       <div class="annotation-workflow">
@@ -3514,6 +3514,21 @@ function setAnnotationStatusText(text) {
   state.annotationStatus = text;
   const status = els.mainPanel.querySelector(".annotation-status");
   if (status) status.textContent = text;
+}
+
+function refreshAnnotationReadyState() {
+  const stats = state.globalPathIndex?.stats || {};
+  const badgeContainer = els.mainPanel.querySelector("[data-annotation-stats]");
+  if (badgeContainer) {
+    badgeContainer.innerHTML = badges([
+      `${fmt(stats.entities || 0)} entities`,
+      `${fmt(stats.concepts || 0)} ontology IDs`,
+      `${fmt(state.manifest?.papers?.length || 0)} papers`
+    ]);
+  }
+  if (!state.annotationStatus || /loading annotation database/i.test(state.annotationStatus)) {
+    setAnnotationStatusText("Database ready. Click Annotate when your list is ready.");
+  }
 }
 
 function annotationResultSummary() {
@@ -4476,7 +4491,7 @@ function groupSignalRows(rows) {
 
 function annotationExampleButton(label, value) {
   return `
-    <button class="annotation-example" type="button" data-annotation-example="${esc(value)}">
+    <button class="annotation-example" type="button" data-action="set-annotation-example" data-example="${esc(value)}">
       ${esc(label)}
     </button>
   `;
@@ -4888,6 +4903,8 @@ async function runAnnotationLookup() {
 
 async function setAnnotationExample(value) {
   state.annotationInput = value;
+  const liveInput = document.getElementById("annotationInput");
+  if (liveInput) liveInput.value = value;
   state.annotationResults = [];
   state.annotationEnrichment = [];
   state.annotationSelectionIds = {};

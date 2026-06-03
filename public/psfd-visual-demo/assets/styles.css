@@ -3849,6 +3849,12 @@ body[data-tab="discover"] .top-controls,
 body[data-tab="discover"] .sidebar,
 body[data-tab="discover"] .inspector {
   display: none;
+  pointer-events: none;
+}
+
+body[data-tab="discover"] .sidebar *,
+body[data-tab="discover"] .tab {
+  pointer-events: none;
 }
 
 body[data-tab="discover"] .shell {
