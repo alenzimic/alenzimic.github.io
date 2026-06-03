@@ -277,6 +277,32 @@ function installGlobalHandlers() {
     );
   });
 
+  document.addEventListener("click", (event) => {
+    if (event.__psfdActionHandled) return;
+    const clicked = event.target instanceof Element ? event.target : event.target?.parentElement;
+    if (!clicked) return;
+    const annotationTarget = clicked.closest(annotationControlSelector());
+    if (!annotationTarget) return;
+    const handled = runAnnotationControlAction(annotationTarget);
+    if (!handled) return;
+    event.__psfdActionHandled = true;
+    event.preventDefault();
+    event.stopPropagation();
+  }, true);
+
+  document.addEventListener("click", (event) => {
+    if (event.__psfdActionHandled) return;
+    const clicked = event.target instanceof Element ? event.target : event.target?.parentElement;
+    if (!clicked) return;
+    const actionTarget = clicked.closest("[data-action]");
+    if (!actionTarget) return;
+    const handled = runButtonAction(actionTarget.getAttribute("data-action"), actionTarget.getAttribute("data-id") || "", actionTarget);
+    if (!handled) return;
+    event.__psfdActionHandled = true;
+    event.preventDefault();
+    event.stopPropagation();
+  }, true);
+
   document.body.addEventListener("click", (event) => {
     if (event.__psfdActionHandled) return;
     const clicked = event.target instanceof Element ? event.target : event.target?.parentElement;
@@ -300,6 +326,15 @@ function installGlobalHandlers() {
       render();
       return;
     }
+    const annotationTarget = clicked.closest(annotationControlSelector());
+    if (annotationTarget) {
+      const handled = runAnnotationControlAction(annotationTarget);
+      if (!handled) return;
+      event.__psfdActionHandled = true;
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     const actionTarget = clicked.closest("[data-action]");
     if (!actionTarget) return;
     const action = actionTarget.getAttribute("data-action");
@@ -310,6 +345,65 @@ function installGlobalHandlers() {
     event.preventDefault();
     event.stopPropagation();
   }, true);
+}
+
+function annotationControlSelector() {
+  return "[data-annotation-action], [data-annotation-example], [data-annotation-select-match], [data-annotation-tab], [data-annotation-search]";
+}
+
+function runAnnotationControlAction(target) {
+  const action = target.getAttribute("data-annotation-action");
+  if (action === "annotate") {
+    const liveInput = document.getElementById("annotationInput");
+    if (liveInput) state.annotationInput = liveInput.value;
+    window.setTimeout(() => runAnnotationLookup(), 0);
+    return true;
+  }
+  if (action === "download-annotations") {
+    window.setTimeout(() => exportAnnotationTable(), 0);
+    return true;
+  }
+  if (action === "download-enrichment") {
+    window.setTimeout(() => exportEnrichmentTable(), 0);
+    return true;
+  }
+  const example = target.getAttribute("data-annotation-example");
+  if (example !== null) {
+    window.setTimeout(() => setAnnotationExample(example), 0);
+    return true;
+  }
+  const selectedMatch = target.getAttribute("data-annotation-select-match");
+  if (selectedMatch !== null) {
+    const term = target.getAttribute("data-term") || "";
+    if (!term || !selectedMatch) return true;
+    window.setTimeout(() => {
+      state.annotationSelectionIds[term] = selectedMatch;
+      state.annotationEnrichment = computeAnnotationEnrichment();
+      state.annotationStatus = `Showing ${annotationMeaningCategory(state.globalPathIndexes?.entityById?.get(selectedMatch) || {})} meaning for ${term}.`;
+      render();
+    }, 0);
+    return true;
+  }
+  const tab = target.getAttribute("data-annotation-tab");
+  if (tab !== null) {
+    window.setTimeout(() => {
+      state.tab = tab || state.tab;
+      state.pathResults = [];
+      state.listPage = 0;
+      render();
+    }, 0);
+    return true;
+  }
+  const search = target.getAttribute("data-annotation-search");
+  if (search !== null) {
+    const searchTab = target.getAttribute("data-annotation-search-tab") || "entities";
+    const searchPmcid = target.getAttribute("data-annotation-pmcid") || "";
+    window.setTimeout(() => {
+      openAnnotationSearch(search || "", searchTab, searchPmcid).catch(reportButtonActionError);
+    }, 0);
+    return true;
+  }
+  return false;
 }
 
 function runButtonAction(action, id, actionTarget) {
@@ -4442,61 +4536,7 @@ function bindAnnotationWorkspaceHandlers() {
     });
   }
 
-  els.mainPanel.querySelectorAll("[data-annotation-action]").forEach((button) => {
-    button.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      const action = button.getAttribute("data-annotation-action");
-      if (action === "annotate") runAnnotationLookup();
-      if (action === "download-annotations") exportAnnotationTable();
-      if (action === "download-enrichment") exportEnrichmentTable();
-    });
-  });
-
-  els.mainPanel.querySelectorAll("[data-annotation-example]").forEach((button) => {
-    button.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      setAnnotationExample(button.getAttribute("data-annotation-example") || "");
-    });
-  });
-
-  els.mainPanel.querySelectorAll("[data-annotation-select-match]").forEach((button) => {
-    button.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      const term = button.getAttribute("data-term") || "";
-      const id = button.getAttribute("data-annotation-select-match") || "";
-      if (!term || !id) return;
-      state.annotationSelectionIds[term] = id;
-      state.annotationEnrichment = computeAnnotationEnrichment();
-      state.annotationStatus = `Showing ${annotationMeaningCategory(state.globalPathIndexes?.entityById?.get(id) || {})} meaning for ${term}.`;
-      render();
-    });
-  });
-
-  els.mainPanel.querySelectorAll("[data-annotation-tab]").forEach((button) => {
-    button.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      state.tab = button.getAttribute("data-annotation-tab") || state.tab;
-      state.pathResults = [];
-      state.listPage = 0;
-      render();
-    });
-  });
-
-  els.mainPanel.querySelectorAll("[data-annotation-search]").forEach((button) => {
-    button.addEventListener("click", async (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      await openAnnotationSearch(
-        button.getAttribute("data-annotation-search") || "",
-        button.getAttribute("data-annotation-search-tab") || "entities",
-        button.getAttribute("data-annotation-pmcid") || ""
-      );
-    });
-  });
+  // Annotation click controls are handled by the delegated global router.
 }
 
 async function openAnnotationSearch(query, tab = "entities", pmcid = "") {
