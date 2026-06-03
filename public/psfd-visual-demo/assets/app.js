@@ -3248,7 +3248,7 @@ function renderDiscoverWorkbench() {
       <div class="hero-title">
         <div>
           <h2>PSFD Annotation Workspace</h2>
-          <p>Batch annotation and enrichment for genes, proteins, compounds, aliases, and ontology IDs from all PSFD papers.</p>
+          <p>Paste genes, proteins, compounds, aliases, or ontology IDs to get concise PSFD annotations and research signals from all papers.</p>
         </div>
         <div>${badges(ready ? [`${fmt(stats.entities || 0)} entities`, `${fmt(stats.concepts || 0)} ontology IDs`, `${fmt(state.manifest?.papers?.length || 0)} papers`] : ["loading database"])}</div>
       </div>
@@ -3272,7 +3272,7 @@ function renderDiscoverWorkbench() {
           <div class="annotation-actions">
             <button class="mini-button primary-action" type="button" data-annotation-action="annotate">Annotate</button>
             <button class="mini-button" type="button" data-annotation-action="download-annotations" ${state.annotationResults.length ? "" : "disabled"}>Download annotations</button>
-            <button class="mini-button" type="button" data-annotation-action="download-enrichment" ${state.annotationEnrichment.length ? "" : "disabled"}>Download enrichment</button>
+            <button class="mini-button" type="button" data-annotation-action="download-enrichment" ${state.annotationEnrichment.length ? "" : "disabled"}>Download signals</button>
           </div>
           <div class="annotation-status">${esc(state.annotationStatus || (ready ? "Paste or type a query, then click Annotate." : "Loading annotation database"))}</div>
         </section>
@@ -3292,8 +3292,8 @@ function renderDiscoverWorkbench() {
           <div class="annotation-panel-head">
             <span>03</span>
             <div>
-              <h3>Enrichment</h3>
-              <small>Matched set versus PSFD background</small>
+              <h3>Research signals</h3>
+              <small>Evidence patterns across matched entities</small>
             </div>
           </div>
           ${renderEnrichmentPanel()}
@@ -3345,11 +3345,11 @@ function renderAnnotationResults() {
 function annotationRows() {
   return state.annotationResults.map((row) => {
     const entity = row.matches[0] || null;
-    return buildAnnotationRow(row.term, entity, row.matches.length);
+    return buildAnnotationRow(row.term, entity, row.matches.length, row.matches);
   });
 }
 
-function buildAnnotationRow(term, entity, matchCount = 0) {
+function buildAnnotationRow(term, entity, matchCount = 0, matches = []) {
   if (!entity) {
     return {
       term,
@@ -3361,7 +3361,8 @@ function buildAnnotationRow(term, entity, matchCount = 0) {
       annotation: "No PSFD match",
       evidence: "",
       data: "",
-      matchCount
+      matchCount,
+      matches
     };
   }
   const ids = uniqueStrings([entity.ontology_id, ...geneProteinOntologyIds(entity)]).filter(Boolean);
@@ -3375,7 +3376,8 @@ function buildAnnotationRow(term, entity, matchCount = 0) {
     annotation: annotationEntitySummary(entity),
     evidence: `${fmt(entity.relation_count || 0)} relations, ${fmt(entity.event_count || 0)} events`,
     data: annotationDataFlags(entity).join(", "),
-    matchCount
+    matchCount,
+    matches
   };
 }
 
@@ -3406,7 +3408,9 @@ function annotationSummaryCard(row) {
         </div>
         <div class="annotation-confidence">${esc(profile.status)}</div>
       </div>
-      <p class="annotation-plain-summary">${esc(profile.summary)}</p>
+      <button class="annotation-plain-summary" type="button" data-action="select-global" data-kind="entity" data-id="${esc(entity.id)}" data-pmcid="${esc(entity.pmcid)}">
+        ${esc(profile.summary)}
+      </button>
       <div class="annotation-summary-grid">
         ${summaryMiniPanel("Identity", profile.identity)}
         ${summaryMiniPanel("Useful metadata", profile.metadata)}
@@ -3424,6 +3428,7 @@ function annotationSummaryCard(row) {
         <button class="mini-button" type="button" data-action="path-end" data-id="${esc(entity.id)}">Use as path end</button>
         <button class="mini-button" type="button" data-action="select-global" data-kind="entity" data-id="${esc(entity.id)}" data-pmcid="${esc(entity.pmcid)}">Inspect evidence</button>
       </div>
+      ${renderAlternateMatches(row)}
     </article>
   `;
 }
@@ -3433,12 +3438,30 @@ function summaryMiniPanel(title, rows) {
     <section class="summary-mini-panel">
       <h5>${esc(title)}</h5>
       <div>
-        ${rows.length ? rows.slice(0, 5).map((row) => `
-          <div><span>${esc(row[0])}</span><strong>${esc(row[1])}</strong></div>
-        `).join("") : `<p class="muted">No data available.</p>`}
+        ${rows.length ? rows.slice(0, 5).map(summaryMiniRow).join("") : `<p class="muted">No data available.</p>`}
       </div>
     </section>
   `;
+}
+
+function summaryMiniRow(row) {
+  const content = `<span>${esc(row[0])}</span><strong>${esc(row[1])}</strong>`;
+  const meta = row[2] || {};
+  if (meta.action) {
+    return `
+      <button class="summary-mini-row clickable" type="button" data-action="${esc(meta.action)}" data-kind="${esc(meta.kind || "")}" data-id="${esc(meta.id || "")}" data-pmcid="${esc(meta.pmcid || "")}">
+        ${content}
+      </button>
+    `;
+  }
+  if (meta.search) {
+    return `
+      <button class="summary-mini-row clickable" type="button" data-annotation-search="${esc(meta.search)}" data-annotation-search-tab="${esc(meta.tab || "entities")}" data-annotation-pmcid="${esc(meta.pmcid || "")}">
+        ${content}
+      </button>
+    `;
+  }
+  return `<div class="summary-mini-row">${content}</div>`;
 }
 
 function summaryThemePanel(title, rows, emptyText) {
@@ -3446,23 +3469,43 @@ function summaryThemePanel(title, rows, emptyText) {
     <section class="summary-theme-panel">
       <h5>${esc(title)}</h5>
       <div>
-        ${rows.length ? rows.slice(0, 6).map((row) => `
-          <div class="summary-theme-row">
-            <strong>${esc(row.label)}</strong>
-            <span>${esc(row.detail || `${fmt(row.count)} evidence item${row.count === 1 ? "" : "s"}`)}</span>
-          </div>
-        `).join("") : `<p class="muted">${esc(emptyText)}</p>`}
+        ${rows.length ? rows.slice(0, 6).map(summaryThemeRow).join("") : `<p class="muted">${esc(emptyText)}</p>`}
       </div>
     </section>
   `;
+}
+
+function summaryThemeRow(row) {
+  const detail = row.detail || `${fmt(row.count)} evidence item${row.count === 1 ? "" : "s"}`;
+  const content = `
+    <strong>${esc(row.label)}</strong>
+    <span>${esc(detail)}</span>
+  `;
+  if (row.action) {
+    return `
+      <button class="summary-theme-row clickable" type="button" data-action="${esc(row.action)}" data-kind="${esc(row.kind || "")}" data-id="${esc(row.id || "")}" data-pmcid="${esc(row.pmcid || "")}">
+        ${content}
+      </button>
+    `;
+  }
+  if (row.search) {
+    return `
+      <button class="summary-theme-row clickable" type="button" data-annotation-search="${esc(row.search)}" data-annotation-search-tab="${esc(row.tab || "entities")}" data-annotation-pmcid="${esc(row.pmcid || "")}">
+        ${content}
+      </button>
+    `;
+  }
+  return `<div class="summary-theme-row">${content}</div>`;
 }
 
 function annotationEntityProfile(entity) {
   const ids = uniqueStrings([entity.ontology_id, ...asArray(entity.ontology_ids), ...geneProteinOntologyIds(entity)]).filter(Boolean);
   const relations = state.globalPathIndexes?.relationsByEntity?.get(entity.id) || [];
   const events = state.globalPathIndexes?.eventsByEntity?.get(entity.id) || [];
-  const relationThemes = topCountRows(relations.map((rel) => clean(rel.predicate_class || rel.predicate || "relation")), 6);
-  const eventThemes = topCountRows(events.map((event) => clean(event.type || "event")), 6);
+  const relationThemes = topCountRows(relations.map((rel) => clean(rel.predicate_class || rel.predicate || "relation")), 6)
+    .map((row) => ({ ...row, search: row.label, tab: "relations", pmcid: entity.pmcid }));
+  const eventThemes = topCountRows(events.map((event) => clean(event.type || "event")), 6)
+    .map((row) => ({ ...row, search: row.label, tab: "events", pmcid: entity.pmcid }));
   const neighbors = annotationNeighborRows(entity, relations);
   const bridges = annotationBridgeRows(entity, ids);
   const profile = entity.gene_protein_normalization || {};
@@ -3470,15 +3513,15 @@ function annotationEntityProfile(entity) {
   const status = annotationStatusLabel(entity, profile, compound);
   return {
     status,
-    summary: annotationPlainSummary(entity, relationThemes, eventThemes, neighbors, bridges),
+    summary: annotationPlainSummary(entity, relations, events, relationThemes, eventThemes, neighbors, bridges),
     identity: annotationIdentityRows(entity, ids),
     metadata: annotationMetadataRows(entity, profile, compound),
     evidence: [
-      ["Relations", fmt(entity.relation_count || relations.length || 0)],
-      ["Events", fmt(entity.event_count || events.length || 0)],
+      ["Relations", fmt(entity.relation_count || relations.length || 0), { action: "select-global", kind: "entity", id: entity.id, pmcid: entity.pmcid }],
+      ["Events", fmt(entity.event_count || events.length || 0), { action: "select-global", kind: "entity", id: entity.id, pmcid: entity.pmcid }],
       ["Paper", entity.pmcid || "-"],
-      ["Top relation", relationThemes[0]?.label || "-"],
-      ["Top event context", eventThemes[0]?.label || "-"],
+      ["Top relation", relationThemes[0]?.label || "-", relationThemes[0] ? { search: relationThemes[0].label, tab: "relations", pmcid: entity.pmcid } : null],
+      ["Top event context", eventThemes[0]?.label || "-", eventThemes[0] ? { search: eventThemes[0].label, tab: "events", pmcid: entity.pmcid } : null],
     ],
     relationThemes,
     eventThemes,
@@ -3497,25 +3540,64 @@ function annotationStatusLabel(entity, profile, compound) {
   return "partial match";
 }
 
-function annotationPlainSummary(entity, relationThemes, eventThemes, neighbors, bridges) {
+function annotationPlainSummary(entity, relations, events, relationThemes, eventThemes, neighbors, bridges) {
   const name = pathEntityName(entity);
   const type = clean(entity.type || entity.entity_type || "entity");
-  const pieces = [`${name} is annotated as ${type}`];
-  const primary = annotationEntitySummary(entity);
-  if (primary) pieces.push(`with ${primary}`);
-  pieces.push(`PSFD contains ${fmt(entity.relation_count || 0)} relation${Number(entity.relation_count || 0) === 1 ? "" : "s"} and ${fmt(entity.event_count || 0)} event${Number(entity.event_count || 0) === 1 ? "" : "s"} for this entity`);
-  if (relationThemes[0]) pieces.push(`the strongest relation theme is ${relationThemes[0].label}`);
-  if (eventThemes[0]) pieces.push(`the main event context is ${eventThemes[0].label}`);
-  if (neighbors[0]) pieces.push(`the closest connected entity is ${neighbors[0].label}`);
-  if (bridges[0]) pieces.push(`it can bridge to ${bridges[0].detail}`);
+  const evidence = `${fmt(entity.relation_count || relations.length || 0)} relation${Number(entity.relation_count || relations.length || 0) === 1 ? "" : "s"} and ${fmt(entity.event_count || events.length || 0)} event${Number(entity.event_count || events.length || 0) === 1 ? "" : "s"}`;
+  const definition = conciseEntityDefinition(entity);
+  const eventLabels = uniqueStrings(events.map((event) => clean(event.label || event.event_label || "")).filter(Boolean)).slice(0, 2);
+  const pieces = [];
+  if (definition) {
+    pieces.push(`${name}: ${definition}`);
+  } else {
+    pieces.push(`${name} is annotated as ${type}`);
+  }
+  pieces.push(`In PSFD it has ${evidence}`);
+  if (relationThemes[0]) pieces.push(`main relation signal: ${relationThemes[0].label}`);
+  if (eventLabels.length) {
+    pieces.push(`event evidence includes ${eventLabels.join(" and ")}`);
+  } else if (eventThemes[0]) {
+    pieces.push(`main event context: ${eventThemes[0].label}`);
+  }
+  if (neighbors[0]) pieces.push(`closest connected entity: ${neighbors[0].label}`);
+  if (bridges[0]) pieces.push(`normalized IDs connect this entity across ${bridges[0].detail}`);
   return `${pieces.join(". ")}.`;
+}
+
+function conciseEntityDefinition(entity) {
+  const profile = entity.gene_protein_normalization || {};
+  const compound = entity.compound_classification || {};
+  const phytozome = asArray(profile.phytozome_ids)[0] || {};
+  const accession = asArray(profile.fasta_accessions)[0] || {};
+  const family = asArray(profile.family_ids)[0] || {};
+  const np = compound.npclassifier || {};
+  const cf = compound.classyfire || {};
+  const selected = String(entity.selected_description || "").replace(/\s+/g, " ").trim();
+  if (selected && selected.length < 260 && !looksLikeEvidenceSentence(selected)) return selected;
+  if (phytozome.gene_id) {
+    return [phytozome.gene_id, phytozome.route_label || phytozome.code, phytozome.sequence_length ? `${phytozome.sequence_length} aa sequence` : ""]
+      .filter(Boolean)
+      .join("; ");
+  }
+  if (accession.accession) return [accession.accession, accession.gene_name || accession.protein_name].filter(Boolean).join("; ");
+  if (family.name || family.ontology_id) return [family.name, family.ontology_id].filter(Boolean).join("; ");
+  if (np.pathway || np.superclass || np.class) return [np.pathway, np.superclass, np.class].filter(Boolean).join("; ");
+  if (cf.superclass || cf.class || cf.direct_parent) return [cf.superclass, cf.class, cf.direct_parent].filter(Boolean).join("; ");
+  if (entity.selected_label || entity.normalized_label) return clean(entity.selected_label || entity.normalized_label);
+  return "";
+}
+
+function looksLikeEvidenceSentence(text) {
+  const cleaned = String(text || "").trim();
+  if (cleaned.length > 320) return true;
+  return /(observed|showed|demonstrated|we report|our study|in contrast|notably|figure|table|plants?|stress)/i.test(cleaned) && cleaned.length > 140;
 }
 
 function annotationIdentityRows(entity, ids) {
   return [
-    ["Matched name", pathEntityName(entity)],
+    ["Matched name", pathEntityName(entity), { action: "select-global", kind: "entity", id: entity.id, pmcid: entity.pmcid }],
     ["Entity type", clean(entity.type || entity.entity_type || "entity")],
-    ["Best ID", ids[0] || "unmapped"],
+    ["Best ID", ids[0] || "unmapped", ids[0] ? { search: ids[0], tab: "entities" } : null],
     ["Normalized label", entity.selected_label || entity.normalized_label || "-"],
     ["Paper", entity.pmcid || "-"],
   ];
@@ -3565,6 +3647,10 @@ function annotationNeighborRows(entity, relations) {
       label: pathEntityName(row.entity),
       count: row.count,
       detail: `${clean(row.entity.type || "entity")} | ${fmt(row.count)} relation${row.count === 1 ? "" : "s"}${row.predicates.size ? ` | ${Array.from(row.predicates).slice(0, 2).join(", ")}` : ""}`,
+      action: "select-global",
+      kind: "entity",
+      id: row.entity.id,
+      pmcid: row.entity.pmcid,
     }));
 }
 
@@ -3579,7 +3665,27 @@ function annotationBridgeRows(entity, ids) {
       label: concept.label || concept.id,
       count: asArray(concept.entity_ids).length,
       detail: `${concept.id} | ${fmt(asArray(concept.entity_ids).length)} entities | ${fmt(asArray(concept.papers).length)} papers`,
+      search: concept.id,
+      tab: "entities",
     }));
+}
+
+function renderAlternateMatches(row) {
+  const matches = asArray(row.matches).filter((entity) => entity?.id && entity.id !== row.entity?.id).slice(0, 4);
+  if (!matches.length) return "";
+  return `
+    <section class="annotation-alternates">
+      <h5>Other possible matches</h5>
+      <div>
+        ${matches.map((entity) => `
+          <button class="alternate-match" type="button" data-action="select-global" data-kind="entity" data-id="${esc(entity.id)}" data-pmcid="${esc(entity.pmcid)}" style="--entity-color:${esc(colorForEntity(entity.type || entity.entity_type))}">
+            <strong>${esc(pathEntityName(entity))}</strong>
+            <span>${esc([entity.pmcid, clean(entity.type || entity.entity_type || "entity")].filter(Boolean).join(" | "))}</span>
+          </button>
+        `).join("")}
+      </div>
+    </section>
+  `;
 }
 
 function annotationFastaButton(entity, profile) {
@@ -3656,7 +3762,7 @@ function renderEnrichmentPanel() {
             <span>${fmt(group.rows.length)} signal${group.rows.length === 1 ? "" : "s"}</span>
           </div>
           ${group.rows.slice(0, 6).map((term) => `
-            <article class="research-signal-card">
+            <button class="research-signal-card" type="button" data-annotation-search="${esc(term.label)}" data-annotation-search-tab="${esc(annotationSignalTab(term.category))}">
               <div>
                 <strong>${esc(term.label)}</strong>
                 <span>${esc(term.detail || "")}</span>
@@ -3666,12 +3772,19 @@ function renderEnrichmentPanel() {
                 <span>${esc(term.unit || "hits")}</span>
               </div>
               ${term.entities?.length ? `<small>${esc(term.entities.slice(0, 4).join(", "))}${term.entities.length > 4 ? ` +${term.entities.length - 4}` : ""}</small>` : ""}
-            </article>
+            </button>
           `).join("")}
         </section>
       `).join("")}
     </div>
   `;
+}
+
+function annotationSignalTab(category) {
+  if (category === "Relation themes") return "relations";
+  if (category === "Event contexts") return "events";
+  if (category === "Connected entities" || category === "Cross-paper bridges") return "entities";
+  return "entities";
 }
 
 function groupSignalRows(rows) {
@@ -3750,6 +3863,31 @@ function bindAnnotationWorkspaceHandlers() {
       render();
     });
   });
+
+  els.mainPanel.querySelectorAll("[data-annotation-search]").forEach((button) => {
+    button.addEventListener("click", async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      await openAnnotationSearch(
+        button.getAttribute("data-annotation-search") || "",
+        button.getAttribute("data-annotation-search-tab") || "entities",
+        button.getAttribute("data-annotation-pmcid") || ""
+      );
+    });
+  });
+}
+
+async function openAnnotationSearch(query, tab = "entities", pmcid = "") {
+  if (pmcid && pmcid !== state.paper) {
+    await loadPaper(pmcid, { preservePath: true });
+  }
+  state.tab = tab || "entities";
+  state.query = query || "";
+  state.listPage = 0;
+  state.pathResults = [];
+  if (state.tab === "entities" && !pmcid) state.entityScope = "all";
+  if (els.searchInput) els.searchInput.value = state.query;
+  render();
 }
 
 function discoveryEntityOptions() {
@@ -4051,6 +4189,11 @@ async function runAnnotationLookup() {
     const matched = state.annotationResults.filter((row) => row.matches.length).length;
     state.annotationStatus = `${fmt(matched)} of ${fmt(terms.length)} queries matched.`;
     render();
+    if (typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(() => {
+        els.mainPanel.querySelector(".annotation-output-panel")?.scrollIntoView({ block: "start", behavior: "smooth" });
+      });
+    }
   } catch (error) {
     console.error(error);
     state.annotationStatus = `Annotation failed: ${error.message}`;
@@ -4069,6 +4212,7 @@ async function setAnnotationExample(value) {
 function rankedEntityMatches(term) {
   const query = String(term || "").trim().toLowerCase();
   if (!query) return [];
+  const shortQuery = query.length <= 3;
   return state.globalPathIndex.entities
     .map((entity) => {
       const name = pathEntityName(entity).toLowerCase();
@@ -4082,14 +4226,25 @@ function rankedEntityMatches(term) {
       if (ontologyIds.includes(query)) score += 120;
       if (ontologyLocalIds.includes(query)) score += 110;
       if (name === query || selected === query) score += 100;
-      if (name.includes(query) || selected.includes(query)) score += 50;
-      if (search.includes(query)) score += 30;
+      if (shortQuery) {
+        if (textHasQueryToken([name, selected].join(" "), query)) score += 48;
+        if (textHasQueryToken(search, query)) score += 24;
+      } else {
+        if (name.includes(query) || selected.includes(query)) score += 50;
+        if (search.includes(query)) score += 30;
+      }
       score += Math.min(20, entityEvidenceWeight(entity));
       return { entity, score };
     })
     .filter((item) => item.score > 20)
     .sort((a, b) => b.score - a.score || pathEntityName(a.entity).localeCompare(pathEntityName(b.entity)))
     .map((item) => item.entity);
+}
+
+function textHasQueryToken(text, query) {
+  const escaped = String(query || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  if (!escaped) return false;
+  return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, "i").test(String(text || ""));
 }
 
 function computeAnnotationEnrichment() {
@@ -4368,9 +4523,9 @@ function exportAnnotationTable() {
       row.pmcid,
       row.normalized,
       profile?.summary || row.annotation,
-      profile ? profile.identity.map((item) => item.join(": ")).join(" | ") : "",
-      profile ? profile.metadata.map((item) => item.join(": ")).join(" | ") : "",
-      profile ? profile.evidence.map((item) => item.join(": ")).join(" | ") : row.evidence,
+      profile ? profile.identity.map((item) => `${item[0]}: ${item[1]}`).join(" | ") : "",
+      profile ? profile.metadata.map((item) => `${item[0]}: ${item[1]}`).join(" | ") : "",
+      profile ? profile.evidence.map((item) => `${item[0]}: ${item[1]}`).join(" | ") : row.evidence,
       profile ? profile.relationThemes.map((item) => `${item.label} (${item.count})`).join(" | ") : "",
       profile ? profile.eventThemes.map((item) => `${item.label} (${item.count})`).join(" | ") : "",
       profile ? profile.neighbors.map((item) => `${item.label} (${item.detail})`).join(" | ") : "",

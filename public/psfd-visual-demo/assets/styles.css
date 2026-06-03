@@ -3879,11 +3879,12 @@ body[data-tab="discover"] .main-panel {
 
 .annotation-workflow {
   display: grid;
-  grid-template-columns: minmax(320px, 0.82fr) minmax(620px, 1.35fr);
+  grid-template-columns: minmax(0, 1fr);
   grid-template-areas:
-    "input annotations"
-    "enrichment enrichment"
-    "advanced advanced";
+    "input"
+    "annotations"
+    "enrichment"
+    "advanced";
   gap: 14px;
   align-items: start;
 }
@@ -3956,7 +3957,7 @@ body[data-tab="discover"] .main-panel {
 .annotation-input-panel textarea {
   position: relative;
   z-index: 5;
-  min-height: 210px;
+  min-height: 150px;
   border-color: #b9c9c3;
   background: #fbfcfb;
   font-size: 14px;
@@ -4098,7 +4099,6 @@ body[data-tab="discover"] .main-panel {
 
 .annotation-summary-head span,
 .annotation-summary-head small,
-.annotation-summary-card p,
 .summary-mini-panel span,
 .summary-theme-row span {
   color: var(--muted);
@@ -4126,12 +4126,27 @@ body[data-tab="discover"] .main-panel {
 }
 
 .annotation-plain-summary {
+  display: block;
+  width: 100%;
   margin: 0;
   padding: 10px 12px;
   border: 1px solid #dce8e2;
   border-radius: 8px;
   background: #f7fbf9;
   color: #243832;
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 1.45;
+  text-align: left;
+  cursor: pointer;
+}
+
+.annotation-plain-summary:hover,
+.summary-theme-row.clickable:hover,
+.alternate-match:hover,
+.research-signal-card:hover {
+  border-color: color-mix(in srgb, var(--entity-color, var(--accent)) 35%, #bed2c9);
+  background: #eef7f3;
 }
 
 .annotation-summary-grid {
@@ -4165,8 +4180,24 @@ body[data-tab="discover"] .main-panel {
   gap: 7px;
 }
 
-.summary-mini-panel div div {
+.summary-mini-row {
+  display: block;
+  width: 100%;
   min-width: 0;
+  padding: 3px 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.summary-mini-row.clickable {
+  cursor: pointer;
+}
+
+.summary-mini-row.clickable:hover {
+  color: var(--accent-dark);
 }
 
 .summary-mini-panel span,
@@ -4197,9 +4228,18 @@ body[data-tab="discover"] .main-panel {
   display: grid;
   gap: 2px;
   min-width: 0;
+  width: 100%;
   padding: 7px 8px;
+  border: 1px solid transparent;
   border-radius: 7px;
   background: #f4f8f6;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.summary-theme-row.clickable {
+  cursor: pointer;
 }
 
 .summary-theme-row strong {
@@ -4213,6 +4253,61 @@ body[data-tab="discover"] .main-panel {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.annotation-alternates {
+  display: grid;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+.annotation-alternates h5 {
+  margin: 0;
+  color: #50625c;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.annotation-alternates > div {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+.alternate-match {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--entity-color, var(--accent)) 22%, var(--line));
+  border-left: 3px solid var(--entity-color, var(--accent));
+  border-radius: 8px;
+  background: #fbfcfb;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.alternate-match strong,
+.alternate-match span {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.alternate-match strong {
+  color: #20312b;
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.alternate-match span {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.3;
 }
 
 .research-signal-grid {
@@ -4251,8 +4346,17 @@ body[data-tab="discover"] .main-panel {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px 10px;
   align-items: center;
+  width: 100%;
   padding: 9px 0;
+  border-right: 0;
+  border-bottom: 0;
+  border-left: 0;
   border-top: 1px solid #edf2ef;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
 .research-signal-card:first-of-type {
