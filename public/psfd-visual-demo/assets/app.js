@@ -191,10 +191,34 @@ function normalizeType(value) {
 
 function ontologyLabel(entity) {
   if (!entity) return "";
+  const concepts = selectedConcepts(entity);
+  if (concepts.length) return concepts.map(conceptDisplayLabel).join(", ");
   const label = entity.selected_label || "";
   const ontologyId = entity.selected_ontology_id || "";
   if (label && ontologyId) return `${label} (${ontologyId})`;
   return label || ontologyId || geneProteinOntologyLabel(entity) || entity.normalized_label || "";
+}
+
+function selectedConcepts(entity) {
+  return asArray(entity?.selected_concepts)
+    .filter((concept) => concept && typeof concept === "object" && (concept.id || concept.ontology_id));
+}
+
+function conceptDisplayLabel(concept) {
+  const id = concept.id || concept.ontology_id || "";
+  const label = concept.label || id;
+  return label && id ? `${label} (${id})` : label || id;
+}
+
+function entityOntologyIds(entity) {
+  return uniqueStrings([
+    entity?.selected_ontology_id,
+    entity?.ontology_id,
+    ...asArray(entity?.selected_ontology_ids),
+    ...asArray(entity?.ontology_ids),
+    ...selectedConcepts(entity).map((concept) => concept.id || concept.ontology_id),
+    ...geneProteinOntologyIds(entity)
+  ]).filter(Boolean);
 }
 
 function entityName(entity) {
@@ -211,6 +235,10 @@ function entitySearchText(entity) {
     entity.selected_label,
     entity.selected_ontology_id,
     entity.selected_description,
+    asArray(entity.selected_ontology_ids).join(" "),
+    asArray(entity.selected_labels).join(" "),
+    asArray(entity.selected_descriptions).join(" "),
+    selectedConcepts(entity).map((concept) => [concept.id, concept.label, concept.description].filter(Boolean).join(" ")).join(" "),
     entity.entity_type,
     asArray(entity.aliases).join(" "),
     compoundSearchText(entity),
@@ -786,7 +814,7 @@ function visibleEntities() {
   if (state.entityScope === "all") return visibleGlobalEntities();
   return state.data.entities
     .filter((entity) => state.entityType === "all" || entity.entity_type === state.entityType)
-    .filter((entity) => !state.normalizedOnly || entity.selected_ontology_id || geneProteinOntologyIds(entity).length)
+    .filter((entity) => !state.normalizedOnly || entityOntologyIds(entity).length)
     .filter((entity) => queryMatches(entitySearchText(entity)))
     .sort((a, b) => {
       const compoundRank = (b.entity_type === "compound") - (a.entity_type === "compound");
@@ -800,7 +828,7 @@ function visibleGlobalEntities() {
   return state.globalPathIndex.entities
     .map(globalEntityToBrowseEntity)
     .filter((entity) => state.entityType === "all" || entity.entity_type === state.entityType)
-    .filter((entity) => !state.normalizedOnly || entity.selected_ontology_id || geneProteinOntologyIds(entity).length)
+    .filter((entity) => !state.normalizedOnly || entityOntologyIds(entity).length)
     .filter((entity) => queryMatches(globalBrowseEntitySearchText(entity)))
     .sort((a, b) => {
       const compoundRank = (b.entity_type === "compound") - (a.entity_type === "compound");
@@ -1168,7 +1196,7 @@ function signalPillValues(item) {
   }
   if (state.tab === "entities") {
     return [
-      item.selected_ontology_id || geneProteinOntologyIds(item).length ? "normalized" : clean(item.decision || "unreviewed"),
+      entityOntologyIds(item).length ? "normalized" : clean(item.decision || "unreviewed"),
       item.gene_protein_normalization?.fasta_accessions?.length ? "FASTA" : "",
       item.event_count ? `${fmt(item.event_count)} events` : "",
       isGlobalEntityBrowseItem(item) ? item.pmcid : ""
@@ -1211,6 +1239,9 @@ function compactOntologyLabel(entity) {
   if (gene) return `UniProt ${gene.accession || gene}`;
   const geneOntology = geneProteinOntologyLabel(entity);
   if (geneOntology) return geneOntology;
+  const ids = entityOntologyIds(entity);
+  if (ids.length > 1) return ids.slice(0, 3).join(", ");
+  if (ids.length === 1) return ids[0];
   if (entity?.selected_ontology_id) return entity.selected_ontology_id;
   if (entity?.selected_label) return entity.selected_label;
   return "";
@@ -1596,7 +1627,7 @@ function entityBridgeKeys(entity) {
     entityName(entity),
     entity.normalized_label,
     entity.selected_label,
-    entity.selected_ontology_id,
+    ...entityOntologyIds(entity),
     ...asArray(entity.aliases)
   ].map(normalizeBridgeKey).filter(Boolean);
 }
@@ -1912,11 +1943,7 @@ function openParticipantGroupModal(eventId, groupKey) {
 }
 
 function participantDetailCard(entity, groupKey) {
-  const ontologyIds = uniqueStrings([
-    entity.selected_ontology_id,
-    entity.ontology_id,
-    ...geneProteinOntologyIds(entity)
-  ]).filter(Boolean);
+  const ontologyIds = entityOntologyIds(entity);
   return `
     <article class="participant-detail-card ${esc(groupKey)}-entity" style="--entity-color:${colorForEntity(entity.entity_type)}">
       <div class="participant-detail-main">
@@ -2595,14 +2622,27 @@ function entitySummary(entity) {
   const geneProfile = geneProteinProfile(entity);
   const geneOntology = geneProteinOntologyLabel(entity);
   const geneOntologyLabel = geneOntology.split(":").slice(1).join(":");
+  const concepts = selectedConcepts(entity);
+  const ontologyNames = uniqueStrings([
+    ...concepts.map((concept) => concept.ontology),
+    entity.selected_ontology,
+    geneOntology ? geneOntology.split(":", 1)[0] : ""
+  ]).filter(Boolean);
+  const ontologyIds = entityOntologyIds(entity);
+  const selectedLabels = uniqueStrings([
+    ...concepts.map((concept) => concept.label),
+    ...asArray(entity.selected_labels),
+    entity.selected_label,
+    geneOntologyLabel
+  ]).filter(Boolean);
   return `
     <div class="two-col">
       <div class="kv">
         <div class="key">Node ID</div><div>${esc(entity.node_id)}</div>
         <div class="key">Decision</div><div>${esc(entity.decision || "-")} ${entity.status ? `(${esc(entity.status)})` : ""}</div>
-        <div class="key">Ontology</div><div>${esc(entity.selected_ontology || (geneOntology ? geneOntology.split(":", 1)[0] : "") || "-")}</div>
-        <div class="key">Ontology ID</div><div>${esc(entity.selected_ontology_id || geneOntology || "-")}</div>
-        <div class="key">Selected label</div><div>${esc(entity.selected_label || geneOntologyLabel || "-")}</div>
+        <div class="key">Ontology</div><div>${ontologyNames.length ? badges(ontologyNames, "ontology", 6) : `<span class="muted">-</span>`}</div>
+        <div class="key">Ontology IDs</div><div>${ontologyIds.length ? badges(ontologyIds, "ontology", 8) : `<span class="muted">-</span>`}</div>
+        <div class="key">Selected labels</div><div>${selectedLabels.length ? badges(selectedLabels, "", 8) : `<span class="muted">-</span>`}</div>
         <div class="key">Aliases</div><div>${badges(entity.aliases, "", 8)}</div>
       </div>
       ${entityDescriptionBlock(entity)}
@@ -2613,6 +2653,22 @@ function entitySummary(entity) {
 }
 
 function entityDescriptionBlock(entity) {
+  const describedConcepts = selectedConcepts(entity).filter((concept) => concept.description || concept.label || concept.id);
+  if (describedConcepts.length > 1) {
+    return `
+      <div class="evidence-block">
+        <strong>Ontology Descriptions</strong>
+        <div class="compact-list">
+          ${describedConcepts.map((concept) => `
+            <div class="compact-card">
+              <strong>${esc(conceptDisplayLabel(concept))}</strong>
+              ${concept.description ? `<p>${esc(concept.description)}</p>` : `<p class="muted">No description text was provided for this ontology assignment.</p>`}
+            </div>
+          `).join("")}
+        </div>
+      </div>
+    `;
+  }
   if (entity.selected_description) {
     return `
       <div class="evidence-block">
@@ -2621,7 +2677,7 @@ function entityDescriptionBlock(entity) {
       </div>
     `;
   }
-  if (entity.selected_ontology_id || entity.selected_label || geneProteinOntologyIds(entity).length) {
+  if (entityOntologyIds(entity).length || entity.selected_label) {
     return `
       <div class="evidence-block">
         <strong>Ontology Description</strong>
@@ -2651,10 +2707,7 @@ function entityResearchPanel(entity, relations, events) {
   const directRelations = relations.filter((rel) => rel.subject_node_id === entity.node_id || rel.object_node_id === entity.node_id).length;
   const contextRelations = Math.max(0, relations.length - directRelations);
   const acceptedDeps = events.reduce((sum, event) => sum + Number(event.dependency_counts?.accepted || 0), 0);
-  const normalizedIds = uniqueStrings([
-    entity.selected_ontology_id,
-    ...geneProteinOntologyIds(entity)
-  ]).filter(Boolean);
+  const normalizedIds = entityOntologyIds(entity);
   return `
     <section class="section-card research-panel">
       <div class="section-header">
@@ -3876,13 +3929,10 @@ function annotationOntologyIds(entity) {
   const pubchem = compound.pubchem || {};
   const normalization = compound.normalization || {};
   return uniqueStrings([
-    entity.ontology_id,
-    entity.selected_ontology_id,
-    ...asArray(entity.ontology_ids),
+    ...entityOntologyIds(entity),
     normalization.selected_ontology_id,
     chebi.id,
     pubchem.cid ? `PubChem:${pubchem.cid}` : "",
-    ...geneProteinOntologyIds(entity),
   ]).filter(Boolean);
 }
 
@@ -3953,7 +4003,7 @@ function annotationStatusLabel(entity, profile, compound) {
   if ((profile.fasta_accessions || []).length) return "protein resolved";
   if ((profile.database_ids || []).length || (profile.family_ids || []).length) return "gene annotated";
   if ((compound.pubchem || {}).cid || (compound.chebi || {}).id) return "compound resolved";
-  if (entity.ontology_id) return "ontology mapped";
+  if (entityOntologyIds(entity).length) return "ontology mapped";
   return "partial match";
 }
 
@@ -4590,7 +4640,8 @@ function discoveryEntityOptions() {
     .slice()
     .sort((a, b) => pathEntityName(a).localeCompare(pathEntityName(b)))
     .map((entity) => {
-      const ontology = entity.ontology_id ? ` | ${entity.ontology_id}` : "";
+      const ontologyIds = entityOntologyIds(entity);
+      const ontology = ontologyIds.length ? ` | ${ontologyIds.slice(0, 2).join(", ")}` : "";
       return `<option value="${esc(pathEntityName(entity))} | ${esc(entity.pmcid)}${esc(ontology)} [${esc(entity.id)}]"></option>`;
     })
     .join("");
@@ -4630,7 +4681,7 @@ function renderLensCatalog() {
         <article class="lens-card">
           <div>
             <strong>${esc(pathEntityName(entity))}</strong>
-            <span>${esc([entity.pmcid, clean(entity.type), entity.ontology_id].filter(Boolean).join(" | "))}</span>
+            <span>${esc([entity.pmcid, clean(entity.type), entityOntologyIds(entity).slice(0, 2).join(", ")].filter(Boolean).join(" | "))}</span>
           </div>
           <div class="click-row">
             <button class="mini-button" type="button" data-action="path-start" data-id="${esc(entity.id)}">Start</button>
@@ -4663,18 +4714,18 @@ function entityMatchesLens(entity, lens) {
 }
 
 function entityEvidenceWeight(entity) {
-  return Number(entity.relation_count || 0) * 3 + Number(entity.event_count || 0) * 2 + (entity.ontology_id ? 4 : 0);
+  return Number(entity.relation_count || 0) * 3 + Number(entity.event_count || 0) * 2 + (entityOntologyIds(entity).length ? 4 : 0);
 }
 
 function isLowSignalDiscoveryEntity(entity) {
   if (!entity) return false;
   const type = String(entity.type || entity.entity_type || "").trim();
   const ontology = String(entity.ontology || entity.selected_ontology || "").trim();
-  const ontologyId = String(entity.ontology_id || entity.selected_ontology_id || "");
+  const ontologyIds = entityOntologyIds(entity);
   const label = [pathEntityName(entity), entity.selected_label, entity.normalized_label].filter(Boolean).join(" ");
   if (discoveryLowSignalTypes.has(type)) return true;
   if (discoveryLowSignalOntologies.has(ontology)) return true;
-  if (/^(UO|NCBITaxon):/i.test(ontologyId)) return true;
+  if (ontologyIds.some((id) => /^(UO|NCBITaxon):/i.test(String(id || "")))) return true;
   return lowSignalLabelPattern.test(label);
 }
 
@@ -4972,15 +5023,15 @@ function isCompoundLikeGlobalEntity(entity) {
 function isChemicalExposureGlobalEntity(entity) {
   const type = String(entity.type || entity.entity_type || "").toLowerCase();
   if (type !== "experimental_condition") return false;
-  const ontology = String(entity.ontology_id || "");
+  const ontologyIds = entityOntologyIds(entity);
   const text = [
     entity.label,
     entity.selected_label,
     entity.normalized_label,
     entity.selected_description,
-    ...asArray(entity.ontology_ids),
+    ...ontologyIds,
   ].join(" ").toLowerCase();
-  return /^PECO:/i.test(ontology) && /\b(exposure|treatment|treated|application|hormone|acid)\b/.test(text);
+  return ontologyIds.some((id) => /^PECO:/i.test(String(id || ""))) && /\b(exposure|treatment|treated|application|hormone|acid)\b/.test(text);
 }
 
 function querySuggestsCondition(query) {
@@ -5167,7 +5218,7 @@ function entityEnrichmentTerms(entity) {
   }
 
   add("Entity type", clean(entity.type || entity.entity_type || "entity"));
-  const ontologyIds = uniqueStrings([entity.ontology_id, ...asArray(entity.ontology_ids), ...geneProteinOntologyIds(entity)]).filter(Boolean);
+  const ontologyIds = entityOntologyIds(entity);
   ontologyIds.forEach((id) => add("Ontology source", ontologySourceLabel(id)));
 
   const profile = entity.gene_protein_normalization || {};
@@ -5326,10 +5377,7 @@ function csvCell(value) {
 }
 
 function annotationMatchCard(entity, index = 0) {
-  const ids = uniqueStrings([
-    entity.ontology_id,
-    ...geneProteinOntologyIds(entity)
-  ]).filter(Boolean);
+  const ids = entityOntologyIds(entity);
   const compound = entity.compound_classification || {};
   const geneProfile = entity.gene_protein_normalization || {};
   const metadata = annotationMetadata(entity);
@@ -5581,7 +5629,8 @@ function renderPathExplorer() {
     .slice()
     .sort((a, b) => pathEntityName(a).localeCompare(pathEntityName(b)))
     .map((entity) => {
-      const ontology = entity.ontology_id ? ` | ${entity.ontology_id}` : "";
+      const ontologyIds = entityOntologyIds(entity);
+      const ontology = ontologyIds.length ? ` | ${ontologyIds.slice(0, 2).join(", ")}` : "";
       return `<option value="${esc(pathEntityName(entity))} | ${esc(entity.pmcid)}${esc(ontology)} [${esc(entity.id)}]"></option>`;
     })
     .join("");
@@ -5638,7 +5687,7 @@ function pathEndpointCard(label, entity) {
     <div class="path-endpoint-card ${entity ? "active" : ""}">
       <span>${esc(label)}</span>
       <strong>${esc(entity ? pathEntityName(entity) : "Choose entity")}</strong>
-      <small>${esc(entity ? [entity.pmcid, clean(entity.type), entity.ontology_id].filter(Boolean).join(" | ") : "Use annotation results or type a name/ID below")}</small>
+      <small>${esc(entity ? [entity.pmcid, clean(entity.type), entityOntologyIds(entity).slice(0, 2).join(", ")].filter(Boolean).join(" | ") : "Use annotation results or type a name/ID below")}</small>
     </div>
   `;
 }
@@ -5775,7 +5824,8 @@ function resolveGlobalEntityQuery(query) {
   const exact = state.globalPathIndex.entities.find((entity) => (
     pathEntityName(entity).toLowerCase() === lowered ||
     String(entity.selected_label || "").toLowerCase() === lowered ||
-    String(entity.ontology_id || "").toLowerCase() === lowered
+    String(entity.ontology_id || "").toLowerCase() === lowered ||
+    asArray(entity.ontology_ids).some((id) => String(id || "").toLowerCase() === lowered)
   ));
   if (exact) return exact.id;
   const partial = state.globalPathIndex.entities.find((entity) => globalEntitySearchText(entity).includes(lowered));
@@ -6158,7 +6208,8 @@ function pathEntityName(entity) {
 function formatPathInput(entity, id) {
   const label = pathEntityName(entity);
   const pmcid = entity.pmcid || state.paper || "";
-  const ontology = entity.ontology_id ? ` | ${entity.ontology_id}` : "";
+  const ontologyIds = entityOntologyIds(entity);
+  const ontology = ontologyIds.length ? ` | ${ontologyIds.slice(0, 2).join(", ")}` : "";
   return `${label} | ${pmcid}${ontology} [${id}]`;
 }
 
@@ -6170,6 +6221,8 @@ function globalEntitySearchText(entity) {
     entity.normalized_label,
     entity.selected_label,
     entity.ontology_id,
+    asArray(entity.ontology_ids).join(" "),
+    selectedConcepts(entity).map((concept) => [concept.id, concept.label, concept.description].filter(Boolean).join(" ")).join(" "),
     entity.ontology,
     entity.type,
     entity.selected_description,
@@ -6287,6 +6340,12 @@ function relationInspector(rel, sourceRows) {
 function entityInspector(entity, sourceRows) {
   const classLine = compoundClassLine(entity);
   const geneOntology = geneProteinOntologyLabel(entity);
+  const ontologyNames = uniqueStrings([
+    ...selectedConcepts(entity).map((concept) => concept.ontology),
+    entity.selected_ontology,
+    geneOntology ? geneOntology.split(":", 1)[0] : ""
+  ]).filter(Boolean);
+  const ontologyIds = entityOntologyIds(entity);
   return `
     <h2>Inspector</h2>
     <div class="kv">
@@ -6294,8 +6353,8 @@ function entityInspector(entity, sourceRows) {
       <div class="key">Canonical</div><div>${esc(entityName(entity))}</div>
       <div class="key">Type</div><div>${esc(clean(entity.entity_type))}</div>
       <div class="key">Decision</div><div>${esc(entity.decision || "-")}</div>
-      <div class="key">Ontology</div><div>${esc(entity.selected_ontology || (geneOntology ? geneOntology.split(":", 1)[0] : "") || "-")}</div>
-      <div class="key">ID</div><div>${esc(entity.selected_ontology_id || geneOntology || "-")}</div>
+      <div class="key">Ontology</div><div>${ontologyNames.length ? badges(ontologyNames, "ontology", 4) : `<span class="muted">-</span>`}</div>
+      <div class="key">IDs</div><div>${ontologyIds.length ? badges(ontologyIds, "ontology", 6) : `<span class="muted">-</span>`}</div>
       ${classLine ? `<div class="key">Compound class</div><div>${esc(classLine)}</div>` : ""}
       <div class="key">Relations</div><div>${fmt(entity.relation_count)}</div>
       <div class="key">Events</div><div>${fmt(entity.event_count)}</div>
@@ -6387,7 +6446,7 @@ function compoundExplorer(entity) {
       </div>
       <div class="compound-live" data-compound-content="${esc(entity.node_id)}">
         <div class="compound-placeholder">
-          <strong>${esc(entity.selected_ontology_id)}</strong>
+          <strong>${esc(entityOntologyIds(entity)[0] || entity.selected_ontology_id || entityName(entity))}</strong>
           <span>${esc(helperText)}</span>
         </div>
       </div>
@@ -6404,15 +6463,15 @@ function chemicalIdentifier(entity) {
 }
 
 function pubchemCid(entity) {
-  const ontologyId = String(entity?.selected_ontology_id || "");
-  const match = ontologyId.match(/^PubChem:(\d+)$/i);
+  const ontologyId = entityOntologyIds(entity).find((id) => /^PubChem:\d+$/i.test(String(id || ""))) || "";
+  const match = String(ontologyId).match(/^PubChem:(\d+)$/i);
   if (match) return match[1];
   return String(entity?.compound_classification?.pubchem?.cid || "");
 }
 
 function chebiId(entity) {
-  const ontologyId = String(entity?.selected_ontology_id || "");
-  const match = ontologyId.match(/^CHEBI:(\d+)$/i);
+  const ontologyId = entityOntologyIds(entity).find((id) => /^CHEBI:\d+$/i.test(String(id || ""))) || "";
+  const match = String(ontologyId).match(/^CHEBI:(\d+)$/i);
   if (match) return `CHEBI:${match[1]}`;
   return String(entity?.compound_classification?.chebi?.id || "");
 }
