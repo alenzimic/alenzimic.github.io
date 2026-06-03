@@ -285,6 +285,7 @@ function installGlobalHandlers() {
     if (closeTarget) {
       event.__psfdActionHandled = true;
       event.preventDefault();
+      event.stopPropagation();
       closeEntityModal();
       return;
     }
@@ -292,6 +293,7 @@ function installGlobalHandlers() {
     if (tab) {
       event.__psfdActionHandled = true;
       event.preventDefault();
+      event.stopPropagation();
       state.tab = tab.getAttribute("data-tab");
       state.pathResults = [];
       state.listPage = 0;
@@ -300,82 +302,112 @@ function installGlobalHandlers() {
     }
     const actionTarget = clicked.closest("[data-action]");
     if (!actionTarget) return;
-    event.__psfdActionHandled = true;
-    event.preventDefault();
     const action = actionTarget.getAttribute("data-action");
     const id = actionTarget.getAttribute("data-id") || "";
-    if (action === "select-dependency") return navigateLocalItem("dependency", id);
-    if (action === "select-event") return navigateLocalItem("event", id);
-    if (action === "select-relation") return navigateLocalItem("relation", id);
-    if (action === "focus-relation-context") {
+    const handled = runButtonAction(action, id, actionTarget);
+    if (!handled) return;
+    event.__psfdActionHandled = true;
+    event.preventDefault();
+    event.stopPropagation();
+  }, true);
+}
+
+function runButtonAction(action, id, actionTarget) {
+  switch (action) {
+    case "select-dependency":
+      navigateLocalItem("dependency", id);
+      return true;
+    case "select-event":
+      navigateLocalItem("event", id);
+      return true;
+    case "select-relation":
+      navigateLocalItem("relation", id);
+      return true;
+    case "focus-relation-context":
       updateRelationContextFocus(id, actionTarget.closest("[data-relation-event-id]")?.getAttribute("data-relation-event-id") || "");
-    }
-    if (action === "select-entity") return navigateLocalItem("entity", id);
-    if (action === "open-entity") openEntityModal(id);
-    if (action === "show-participants") {
+      return true;
+    case "select-entity":
+      navigateLocalItem("entity", id);
+      return true;
+    case "open-entity":
+      openEntityModal(id);
+      return true;
+    case "show-participants":
       openParticipantGroupModal(id, actionTarget.getAttribute("data-group") || "");
-    }
-    if (action === "path-start") setPathEndpoint("start", id);
-    if (action === "path-end") setPathEndpoint("end", id);
-    if (action === "discover-start") setPathEndpoint("start", id);
-    if (action === "discover-end") setPathEndpoint("end", id);
-    if (action === "find-paths") runPathSearch();
-    if (action === "find-hypotheses") runHypothesisSearch();
-    if (action === "annotate-entities") runAnnotationLookup();
-    if (action === "download-annotations") exportAnnotationTable();
-    if (action === "download-enrichment") exportEnrichmentTable();
-    if (action === "set-annotation-example") setAnnotationExample(actionTarget.getAttribute("data-example") || "");
-    if (action === "set-entity-type") {
+      return true;
+    case "path-start":
+    case "discover-start":
+      setPathEndpoint("start", id);
+      return true;
+    case "path-end":
+    case "discover-end":
+      setPathEndpoint("end", id);
+      return true;
+    case "find-paths":
+      runPathSearch();
+      return true;
+    case "find-hypotheses":
+      runHypothesisSearch();
+      return true;
+    case "annotate-entities":
+      runAnnotationLookup();
+      return true;
+    case "download-annotations":
+      exportAnnotationTable();
+      return true;
+    case "download-enrichment":
+      exportEnrichmentTable();
+      return true;
+    case "set-annotation-example":
+      setAnnotationExample(actionTarget.getAttribute("data-example") || "");
+      return true;
+    case "set-entity-type":
       state.entityType = actionTarget.getAttribute("data-value") || "all";
       state.listPage = 0;
       render();
-    }
-    if (action === "export-hypothesis") exportHypothesisReport(Number(actionTarget.getAttribute("data-index") || 0));
-    if (action === "select-global") {
-      return selectGlobalItem(
+      return true;
+    case "export-hypothesis":
+      exportHypothesisReport(Number(actionTarget.getAttribute("data-index") || 0));
+      return true;
+    case "select-global":
+      selectGlobalItem(
         actionTarget.getAttribute("data-kind") || "",
         id,
         actionTarget.getAttribute("data-pmcid") || ""
-      );
-    }
-    if (action === "list-prev") {
+      ).catch(reportButtonActionError);
+      return true;
+    case "list-prev":
       state.listPage = Math.max(0, state.listPage - 1);
       render();
-    }
-    if (action === "list-next") {
+      return true;
+    case "list-next":
       state.listPage += 1;
       render();
-    }
-    if (action === "load-compound") loadCompoundData(id);
-    if (action === "load-fasta") {
-      loadFastaData(
-        id,
-        actionTarget.getAttribute("data-accession") || "",
-        actionTarget
-      );
-    }
-    if (action === "download-fasta") {
-      downloadFastaData(
-        id,
-        actionTarget.getAttribute("data-accession") || "",
-        actionTarget
-      );
-    }
-    if (action === "load-phytozome-fasta") {
-      loadPhytozomeFastaData(
-        id,
-        actionTarget.getAttribute("data-gene-id") || "",
-        actionTarget
-      );
-    }
-    if (action === "download-phytozome-fasta") {
-      downloadPhytozomeFastaData(
-        id,
-        actionTarget.getAttribute("data-gene-id") || "",
-        actionTarget
-      );
-    }
-  }, true);
+      return true;
+    case "load-compound":
+      loadCompoundData(id);
+      return true;
+    case "load-fasta":
+      loadFastaData(id, actionTarget.getAttribute("data-accession") || "", actionTarget);
+      return true;
+    case "download-fasta":
+      downloadFastaData(id, actionTarget.getAttribute("data-accession") || "", actionTarget);
+      return true;
+    case "load-phytozome-fasta":
+      loadPhytozomeFastaData(id, actionTarget.getAttribute("data-gene-id") || "", actionTarget);
+      return true;
+    case "download-phytozome-fasta":
+      downloadPhytozomeFastaData(id, actionTarget.getAttribute("data-gene-id") || "", actionTarget);
+      return true;
+    default:
+      return false;
+  }
+}
+
+function reportButtonActionError(error) {
+  console.error(error);
+  state.annotationStatus = `Could not open the selected object: ${error.message || error}`;
+  if (state.tab === "discover") render();
 }
 
 async function init() {
@@ -6077,7 +6109,20 @@ async function selectGlobalItem(kind, id, pmcid) {
   if (pmcid && pmcid !== state.paper) {
     await loadPaper(pmcid, { preservePath: true });
   }
+  if (kind === "entity") state.entityScope = "paper";
+  if (!localObjectExists(kind, id)) {
+    throw new Error(`${clean(kind)} ${shortId(id)} was not found in ${pmcid || state.paper}.`);
+  }
   navigateLocalItem(kind, id);
+}
+
+function localObjectExists(kind, id) {
+  if (!state.indexes || !id) return false;
+  if (kind === "dependency") return state.indexes.dependencyById.has(id);
+  if (kind === "event") return state.indexes.eventById.has(id);
+  if (kind === "relation") return state.indexes.relationById.has(id);
+  if (kind === "entity") return state.indexes.entityById.has(id);
+  return false;
 }
 
 function renderInspector() {
