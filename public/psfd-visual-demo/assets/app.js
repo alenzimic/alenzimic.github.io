@@ -44,6 +44,7 @@ const state = {
   annotationEnrichment: [],
   annotationStatus: "",
   annotationEditing: false,
+  annotationCategory: "auto",
   focusedRelationId: "",
   listPage: 0,
   listPageSize: 12,
@@ -3263,6 +3264,13 @@ function renderDiscoverWorkbench() {
             </div>
           </div>
           <textarea id="annotationInput" placeholder="Solyc01g102960.3.1&#10;PTI&#10;piperonylic acid&#10;CHEBI:107644">${esc(state.annotationInput)}</textarea>
+          <div class="annotation-category-control">
+            <label for="annotationCategory">Category</label>
+            <select id="annotationCategory">
+              ${annotationCategoryOptions()}
+            </select>
+            <small>${esc(annotationCategoryHelpText())}</small>
+          </div>
           <div class="annotation-examples">
             ${annotationExampleButton("Tomato gene", "Solyc01g102960.3.1")}
             ${annotationExampleButton("Immune pathway", "PTI")}
@@ -3327,7 +3335,8 @@ function setAnnotationStatusText(text) {
 function annotationResultSummary() {
   if (!state.annotationResults.length) return "No submitted list yet";
   const matched = annotationRows().filter((row) => row.entity).length;
-  return `${fmt(matched)} matched | ${fmt(state.annotationResults.length - matched)} unmatched`;
+  const category = state.annotationCategory === "auto" ? "" : ` | ${annotationCategoryLabel(state.annotationCategory)}`;
+  return `${fmt(matched)} matched | ${fmt(state.annotationResults.length - matched)} unmatched${category}`;
 }
 
 function renderAnnotationResults() {
@@ -3814,6 +3823,35 @@ function annotationExampleButton(label, value) {
   `;
 }
 
+function annotationCategoryOptions() {
+  return annotationCategories().map((item) => (
+    `<option value="${esc(item.id)}" ${state.annotationCategory === item.id ? "selected" : ""}>${esc(item.label)}</option>`
+  )).join("");
+}
+
+function annotationCategories() {
+  return [
+    { id: "auto", label: "Best match", help: "Ranks the most likely biology first, while keeping alternate category matches visible." },
+    { id: "compound", label: "Compounds", types: ["compound"], help: "Use for metabolites, hormones, chemical names, ChEBI IDs, or PubChem IDs." },
+    { id: "gene_protein", label: "Genes/proteins", types: ["gene_protein", "gene", "protein"], help: "Use for gene symbols, protein names, Phytozome IDs, UniProt IDs, or family/domain IDs." },
+    { id: "pathway_or_process", label: "Pathways/processes", types: ["pathway_or_process"], help: "Use for signaling, biosynthesis, metabolism, and biological process terms." },
+    { id: "experimental_condition", label: "Conditions/treatments", types: ["experimental_condition"], help: "Use when the query means an exposure, treatment, stress, dose, or experimental condition." },
+    { id: "trait_function", label: "Traits/functions", types: ["plant_trait", "molecular_trait_or_function", "phenotype"], help: "Use for measured traits, molecular functions, phenotypes, or physiological readouts." },
+    { id: "anatomy", label: "Anatomy/cell/tissue", types: ["anatomical_part", "cellular_component", "developmental_stage"], help: "Use for organs, tissues, cell compartments, or developmental stages." },
+    { id: "context", label: "Genotype/context", types: ["genotype", "genetic_perturbation", "regulatory_motif"], help: "Use for knockouts, overexpression, mutants, motifs, and other experimental context entities." },
+    { id: "taxon", label: "Organisms", types: ["taxon"], help: "Use for species, cultivars, or broader taxonomic terms." },
+    { id: "assay", label: "Assays/measurements", types: ["assay_or_measurement"], help: "Use for instruments, assays, protocols, or measurement systems." },
+  ];
+}
+
+function annotationCategoryLabel(category) {
+  return annotationCategories().find((item) => item.id === category)?.label || "Best match";
+}
+
+function annotationCategoryHelpText() {
+  return annotationCategories().find((item) => item.id === state.annotationCategory)?.help || "";
+}
+
 function bindAnnotationWorkspaceHandlers() {
   const input = document.getElementById("annotationInput");
   if (input) {
@@ -3831,6 +3869,21 @@ function bindAnnotationWorkspaceHandlers() {
       setTimeout(() => {
         state.annotationInput = input.value;
       }, 0);
+    });
+  }
+
+  const category = document.getElementById("annotationCategory");
+  if (category) {
+    category.addEventListener("change", async () => {
+      state.annotationCategory = category.value || "auto";
+      state.annotationStatus = state.annotationResults.length
+        ? `Category changed to ${annotationCategoryLabel(state.annotationCategory)}. Updating annotations...`
+        : `Category set to ${annotationCategoryLabel(state.annotationCategory)}. Click Annotate when your list is ready.`;
+      if (state.annotationResults.length && String(state.annotationInput || "").trim()) {
+        await runAnnotationLookup();
+      } else {
+        render();
+      }
     });
   }
 
@@ -4183,11 +4236,12 @@ async function runAnnotationLookup() {
     state.annotationStatus = "Annotating...";
     state.annotationResults = terms.map((term) => ({
       term,
-      matches: rankedEntityMatches(term).slice(0, 5)
+      matches: rankedEntityMatches(term, state.annotationCategory).slice(0, 5)
     }));
     state.annotationEnrichment = computeAnnotationEnrichment();
     const matched = state.annotationResults.filter((row) => row.matches.length).length;
-    state.annotationStatus = `${fmt(matched)} of ${fmt(terms.length)} queries matched.`;
+    const category = state.annotationCategory === "auto" ? "" : ` in ${annotationCategoryLabel(state.annotationCategory)}`;
+    state.annotationStatus = `${fmt(matched)} of ${fmt(terms.length)} queries matched${category}.`;
     render();
     if (typeof requestAnimationFrame === "function") {
       requestAnimationFrame(() => {
@@ -4209,7 +4263,7 @@ async function setAnnotationExample(value) {
   await runAnnotationLookup();
 }
 
-function rankedEntityMatches(term) {
+function rankedEntityMatches(term, category = "auto") {
   const query = String(term || "").trim().toLowerCase();
   if (!query) return [];
   const shortQuery = query.length <= 3;
@@ -4242,9 +4296,22 @@ function rankedEntityMatches(term) {
       score += Math.min(20, entityEvidenceWeight(entity));
       return { entity, score };
     })
-    .filter((item) => item.score > 20)
+    .filter((item) => item.score > 20 && entityMatchesAnnotationCategory(item.entity, category))
     .sort((a, b) => b.score - a.score || pathEntityName(a.entity).localeCompare(pathEntityName(b.entity)))
     .map((item) => item.entity);
+}
+
+function entityMatchesAnnotationCategory(entity, category = "auto") {
+  if (!category || category === "auto") return true;
+  const selected = annotationCategories().find((item) => item.id === category);
+  if (!selected) return true;
+  const type = String(entity.type || entity.entity_type || "").toLowerCase();
+  if (selected.types?.includes(type)) return true;
+  if (category === "compound") return isCompoundLikeGlobalEntity(entity);
+  if (category === "gene_protein") {
+    return Boolean(Object.keys(entity.gene_protein_normalization || {}).length) || geneProteinOntologyIds(entity).length > 0;
+  }
+  return false;
 }
 
 function isCompoundLikeGlobalEntity(entity) {
@@ -4555,6 +4622,7 @@ function exportAnnotationTable() {
   if (!rows.length) return;
   const header = [
     "input",
+    "category_filter",
     "best_match",
     "type",
     "paper",
@@ -4573,6 +4641,7 @@ function exportAnnotationTable() {
     const profile = row.entity ? annotationEntityProfile(row.entity) : null;
     return [
       row.term,
+      annotationCategoryLabel(state.annotationCategory),
       row.match,
       row.type,
       row.pmcid,
