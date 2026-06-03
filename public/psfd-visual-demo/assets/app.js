@@ -278,15 +278,20 @@ function installGlobalHandlers() {
   });
 
   document.body.addEventListener("click", (event) => {
+    if (event.__psfdActionHandled) return;
     const clicked = event.target instanceof Element ? event.target : event.target?.parentElement;
     if (!clicked) return;
     const closeTarget = clicked.closest("[data-close-modal]");
     if (closeTarget) {
+      event.__psfdActionHandled = true;
+      event.preventDefault();
       closeEntityModal();
       return;
     }
     const tab = clicked.closest("[data-tab]");
     if (tab) {
+      event.__psfdActionHandled = true;
+      event.preventDefault();
       state.tab = tab.getAttribute("data-tab");
       state.pathResults = [];
       state.listPage = 0;
@@ -295,6 +300,8 @@ function installGlobalHandlers() {
     }
     const actionTarget = clicked.closest("[data-action]");
     if (!actionTarget) return;
+    event.__psfdActionHandled = true;
+    event.preventDefault();
     const action = actionTarget.getAttribute("data-action");
     const id = actionTarget.getAttribute("data-id") || "";
     if (action === "select-dependency") return navigateLocalItem("dependency", id);
@@ -368,7 +375,7 @@ function installGlobalHandlers() {
         actionTarget
       );
     }
-  });
+  }, true);
 }
 
 async function init() {
