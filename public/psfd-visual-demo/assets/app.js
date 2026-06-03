@@ -3280,7 +3280,7 @@ function renderDiscoverWorkbench() {
           <div class="annotation-actions">
             <button class="mini-button primary-action" type="button" data-annotation-action="annotate">Annotate</button>
             <button class="mini-button" type="button" data-annotation-action="download-annotations" ${state.annotationResults.length ? "" : "disabled"}>Download annotations</button>
-            <button class="mini-button" type="button" data-annotation-action="download-enrichment" ${state.annotationEnrichment.length ? "" : "disabled"}>Download signals</button>
+            <button class="mini-button" type="button" data-annotation-action="download-enrichment" ${state.annotationEnrichment.length ? "" : "disabled"}>Download batch overview</button>
           </div>
           <div class="annotation-status">${esc(state.annotationStatus || (ready ? "Paste or type a query, then click Annotate." : "Loading annotation database"))}</div>
         </section>
@@ -3300,8 +3300,8 @@ function renderDiscoverWorkbench() {
           <div class="annotation-panel-head">
             <span>03</span>
             <div>
-              <h3>Trait/context signals</h3>
-              <small>Patterns across the matched input list</small>
+              <h3>Batch overview</h3>
+              <small>Shared traits, contexts, and metadata across submitted entities</small>
             </div>
           </div>
           ${renderEnrichmentPanel()}
@@ -3417,11 +3417,10 @@ function annotationSummaryCard(row) {
         </div>
         <div class="annotation-confidence">${esc(profile.status)}</div>
       </div>
-      <button class="annotation-plain-summary" type="button" data-action="select-global" data-kind="entity" data-id="${esc(entity.id)}" data-pmcid="${esc(entity.pmcid)}">
-        ${esc(profile.summary)}
-      </button>
+      ${annotationOntologyPanel(profile.ontology)}
+      <p class="annotation-plain-summary">${esc(profile.summary)}</p>
       ${annotationFactStrip(profile.facts)}
-      ${annotationTraitPanel(profile.traits)}
+      ${annotationMechanismPanel(profile.mechanisms)}
       ${annotationContextPanel(profile.contexts)}
       <div class="annotation-card-actions">
         ${profile.fastaButton || ""}
@@ -3429,6 +3428,20 @@ function annotationSummaryCard(row) {
       </div>
       ${renderAlternateMatches(row)}
     </article>
+  `;
+}
+
+function annotationOntologyPanel(ontology) {
+  if (!ontology?.title) return "";
+  return `
+    <section class="annotation-ontology-panel">
+      <div>
+        <span>Ontology annotation${ontology.source ? ` | ${esc(ontology.source)}` : ""}</span>
+        <strong>${esc(ontology.title)}</strong>
+        ${ontology.id ? `<small>${esc(ontology.id)}</small>` : ""}
+      </div>
+      ${ontology.description ? `<p>${esc(ontology.description)}</p>` : ""}
+    </section>
   `;
 }
 
@@ -3446,26 +3459,27 @@ function annotationFactStrip(facts) {
   `;
 }
 
-function annotationTraitPanel(traits) {
+function annotationMechanismPanel(mechanisms) {
   return `
-    <section class="annotation-trait-panel">
+    <section class="annotation-mechanism-panel">
       <div class="annotation-section-head">
-        <h5>Trait associations</h5>
-        <span>${fmt(traits.length)} trait${traits.length === 1 ? "" : "s"}</span>
+        <h5>Main evidence</h5>
+        <span>${fmt(mechanisms.length)} relation${mechanisms.length === 1 ? "" : "s"}</span>
       </div>
-      ${traits.length ? `
-        <div class="annotation-trait-list">
-          ${traits.slice(0, 6).map((trait) => `
-            <button class="annotation-trait-row" type="button" data-action="select-global" data-kind="entity" data-id="${esc(trait.id)}" data-pmcid="${esc(trait.pmcid)}" style="--entity-color:${esc(trait.color)}">
+      ${mechanisms.length ? `
+        <div class="annotation-mechanism-list">
+          ${mechanisms.slice(0, 6).map((mechanism) => `
+            <button class="annotation-mechanism-row" type="button" data-action="select-global" data-kind="relation" data-id="${esc(mechanism.id)}" data-pmcid="${esc(mechanism.pmcid)}" style="--entity-color:${esc(mechanism.color)}">
               <div>
-                <strong>${esc(trait.label)}</strong>
-                <span>${esc(trait.predicateSummary)}</span>
+                <span>${esc(mechanism.kind)}</span>
+                <strong>${esc(mechanism.statement)}</strong>
               </div>
-              <small>${esc(trait.contextSummary || "No explicit context in extracted relations.")}</small>
+              <p>${esc(mechanism.contextSummary || "No explicit study context was attached to this relation.")}</p>
+              ${mechanism.evidence ? `<small>${esc(mechanism.evidence)}</small>` : ""}
             </button>
           `).join("")}
         </div>
-      ` : `<div class="annotation-empty compact">No direct trait endpoint was extracted for this entity in the demo data.</div>`}
+      ` : `<div class="annotation-empty compact">No direct relation evidence was extracted for this entity in the demo data.</div>`}
     </section>
   `;
 }
@@ -3560,17 +3574,21 @@ function annotationEntityProfile(entity) {
   const relations = state.globalPathIndexes?.relationsByEntity?.get(entity.id) || [];
   const endpointRelations = relations.filter((rel) => relationHasEndpoint(rel, entity.id));
   const traits = annotationTraitRows(entity, endpointRelations);
+  const mechanisms = annotationMechanismRows(entity, endpointRelations);
   const contexts = annotationContextRows(endpointRelations);
+  const ontology = annotationOntologySummary(entity, ids);
   const profile = entity.gene_protein_normalization || {};
   const compound = entity.compound_classification || {};
   const status = annotationStatusLabel(entity, profile, compound);
   const evidenceCount = endpointRelations.length || relations.length || Number(entity.relation_count || 0);
   return {
     status,
-    summary: annotationPlainSummary(entity, endpointRelations, traits, contexts),
+    summary: annotationPlainSummary(entity, endpointRelations, mechanisms, contexts, ontology),
     identity: annotationIdentityRows(entity, ids),
     metadata: annotationMetadataRows(entity, profile, compound),
-    facts: annotationFactRows(entity, ids, evidenceCount, traits, contexts, profile, compound),
+    facts: annotationFactRows(entity, ids, evidenceCount, mechanisms, contexts, profile, compound),
+    ontology,
+    mechanisms,
     traits,
     contexts,
     fastaButton: annotationFastaButton(entity, profile),
@@ -3586,31 +3604,69 @@ function annotationStatusLabel(entity, profile, compound) {
   return "partial match";
 }
 
-function annotationPlainSummary(entity, relations, traits, contexts) {
+function annotationPlainSummary(entity, relations, mechanisms, contexts, ontology) {
   const name = pathEntityName(entity);
   const type = clean(entity.type || entity.entity_type || "entity");
-  const definition = conciseEntityDefinition(entity);
-  const traitNames = traits.slice(0, 3).map((trait) => trait.label);
+  const definition = ontology?.description || conciseEntityDefinition(entity);
+  const mechanismStatements = mechanisms.slice(0, 2).map((mechanism) => mechanism.statement);
   const contextNames = contexts.slice(0, 4).map((context) => context.label);
   const pieces = [];
-  if (definition) {
+  if (ontology?.title) {
+    pieces.push(`${name} maps to ${ontology.title}${ontology.id ? ` (${ontology.id})` : ""}`);
+    if (definition && definition.toLowerCase() !== String(ontology.title).toLowerCase()) pieces.push(definition);
+  } else if (definition) {
     pieces.push(`${name}: ${definition}`);
   } else {
     pieces.push(`${name} is annotated as ${type}`);
   }
-  if (traitNames.length) {
-    pieces.push(`PSFD links it mainly to ${traitNames.join(", ")}`);
+  if (mechanismStatements.length) {
+    pieces.push(`The clearest PSFD evidence is ${mechanismStatements.join("; ")}`);
   } else {
-    pieces.push(`PSFD has ${fmt(relations.length)} extracted relation${relations.length === 1 ? "" : "s"}, but no direct trait endpoint for this entity`);
+    pieces.push(`PSFD has ${fmt(relations.length)} extracted relation${relations.length === 1 ? "" : "s"}, but no direct mechanistic relation was extracted for this entity`);
   }
-  if (contextNames.length) pieces.push(`key contexts include ${contextNames.join(", ")}`);
+  if (contextNames.length) pieces.push(`Study contexts include ${contextNames.join(", ")}`);
   return `${pieces.join(". ")}.`;
 }
 
-function annotationFactRows(entity, ids, evidenceCount, traits, contexts, profile, compound) {
+function annotationOntologySummary(entity, ids) {
+  const profile = entity.gene_protein_normalization || {};
+  const compound = entity.compound_classification || {};
+  const phytozome = asArray(profile.phytozome_ids)[0] || {};
+  const accession = asArray(profile.fasta_accessions)[0] || {};
+  const family = asArray(profile.family_ids)[0] || {};
+  const databaseId = asArray(profile.database_ids)[0] || {};
+  const chebi = compound.chebi || {};
+  const pubchem = compound.pubchem || {};
+  const id = ids[0] || chebi.id || (pubchem.cid ? `PubChem:${pubchem.cid}` : "") || "";
+  const title = [
+    entity.selected_label,
+    chebi.name,
+    phytozome.gene_id,
+    accession.gene_name,
+    accession.protein_name,
+    accession.accession,
+    family.name,
+    databaseId.ontology_id,
+    entity.normalized_label,
+  ].map((value) => String(value || "").trim()).find(Boolean);
+  if (!id && !title && !entity.ontology) return null;
+  const selectedDescription = String(entity.selected_description || "").replace(/\s+/g, " ").trim();
+  const fallback = conciseEntityDefinition(entity);
+  const description = selectedDescription && !looksLikeEvidenceSentence(selectedDescription)
+    ? selectedDescription
+    : fallback;
+  return {
+    id,
+    title: title || id || entity.ontology,
+    source: id ? ontologySourceLabel(id) : clean(entity.ontology || "ontology"),
+    description: description && description !== title ? description : "",
+  };
+}
+
+function annotationFactRows(entity, ids, evidenceCount, mechanisms, contexts, profile, compound) {
   const rows = [
     ["Category", clean(entity.type || entity.entity_type || "entity")],
-    ["Traits", fmt(traits.length)],
+    ["Evidence statements", fmt(mechanisms.length)],
     ["Contexts", fmt(contexts.length)],
     ["Evidence", `${fmt(evidenceCount)} relation${evidenceCount === 1 ? "" : "s"}`],
   ];
@@ -3624,6 +3680,62 @@ function annotationFactRows(entity, ids, evidenceCount, traits, contexts, profil
   else if (pubchem.cid) rows.push(["Resolved as", `PubChem:${pubchem.cid}`]);
   else if (ids[0]) rows.push(["Resolved as", ids[0]]);
   return rows;
+}
+
+function annotationMechanismRows(entity, relations) {
+  return relations
+    .map((rel) => {
+      const subject = state.globalPathIndexes?.entityById?.get(rel.subject_entity_id);
+      const object = state.globalPathIndexes?.entityById?.get(rel.object_entity_id);
+      const selectedIsSubject = rel.subject_entity_id === entity.id;
+      const selectedIsObject = rel.object_entity_id === entity.id;
+      if (!selectedIsSubject && !selectedIsObject) return null;
+      const subjectLabel = subject ? pathEntityName(subject) : rel.subject || "subject";
+      const objectLabel = object ? pathEntityName(object) : rel.object || "object";
+      const predicate = clean(rel.predicate || rel.predicate_class || "relates to");
+      const other = selectedIsSubject ? object : subject;
+      const contexts = annotationSortedContexts(annotationRelationContextEntities(rel));
+      const evidence = shortText(rel.evidence_preview || asArray(rel.evidence_sentence_ids)[0] || "", 220);
+      const kind = annotationMechanismKind(rel, other);
+      return {
+        id: rel.id,
+        pmcid: rel.pmcid,
+        kind,
+        rank: annotationMechanismRank(kind),
+        statement: shortText(`${subjectLabel} ${predicate} ${objectLabel}`, 150),
+        contextSummary: contexts.length
+          ? `Context: ${contexts.slice(0, 4).map((context) => context.label).join(", ")}${contexts.length > 4 ? `, +${fmt(contexts.length - 4)} more` : ""}`
+          : "",
+        evidence,
+        color: colorForEntity(other?.type || other?.entity_type || entity.type || entity.entity_type),
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.rank - b.rank || b.evidence.length - a.evidence.length || a.statement.localeCompare(b.statement));
+}
+
+function annotationMechanismKind(rel, other) {
+  const text = `${rel.predicate_class || ""} ${rel.predicate || ""} ${other?.type || other?.entity_type || ""}`;
+  if (isTraitLikeEntity(other) || /trait|phenotype|physiolog|tolerance|resistance/i.test(text)) return "Trait or phenotype";
+  if (/gene expression|abundance|regulat|transcription|protein/i.test(text)) return "Regulation";
+  if (/metabol|biosynthesis|compound|chemical/i.test(text)) return "Metabolism";
+  if (/stress|condition|exposure|treatment/i.test(text)) return "Stress response";
+  if (/locali[sz]ation|cellular component/i.test(text)) return "Localization";
+  if (/molecular|activity|function/i.test(text)) return "Molecular function";
+  return "Relation evidence";
+}
+
+function annotationMechanismRank(kind) {
+  const order = {
+    "Trait or phenotype": 0,
+    "Regulation": 1,
+    "Metabolism": 2,
+    "Stress response": 3,
+    "Molecular function": 4,
+    "Localization": 5,
+    "Relation evidence": 6,
+  };
+  return order[kind] ?? 9;
 }
 
 function annotationTraitRows(entity, relations) {
@@ -3680,7 +3792,29 @@ function annotationContextRows(relations) {
     });
   });
   return Array.from(byContext.values())
-    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+    .sort((a, b) => annotationContextPriority(a.type) - annotationContextPriority(b.type) || b.count - a.count || a.label.localeCompare(b.label));
+}
+
+function annotationSortedContexts(contexts) {
+  return asArray(contexts)
+    .slice()
+    .sort((a, b) => annotationContextPriority(a.type) - annotationContextPriority(b.type) || a.label.localeCompare(b.label));
+}
+
+function annotationContextPriority(type) {
+  const cleaned = String(type || "").toLowerCase();
+  const priority = {
+    "experimental condition": 0,
+    "condition parameter": 1,
+    "genetic perturbation": 2,
+    "genotype": 3,
+    "taxon": 4,
+    "anatomical structure": 5,
+    "cellular component": 6,
+    "developmental stage": 7,
+    "assay method": 8,
+  };
+  return priority[cleaned] ?? 9;
 }
 
 function annotationRelationContextEntities(rel) {
@@ -3910,13 +4044,17 @@ function annotationDataFlags(entity) {
 
 function renderEnrichmentPanel() {
   if (!state.annotationResults.length) {
-    return `<div class="annotation-empty">Trait and context signals appear after annotation.</div>`;
+    return `<div class="annotation-empty">Batch overview appears after annotating a submitted list.</div>`;
   }
-  if (!annotationRows().some((row) => row.entity)) {
+  const matchedRows = annotationRows().filter((row) => row.entity);
+  if (!matchedRows.length) {
     return `<div class="annotation-empty">No matched entities to summarize.</div>`;
   }
+  if (matchedRows.length < 2) {
+    return `<div class="annotation-empty">Submit at least two matched genes, proteins, or compounds to summarize shared traits, contexts, and metadata across the list.</div>`;
+  }
   if (!state.annotationEnrichment.length) {
-    return `<div class="annotation-empty">No trait or context signals were detected for the matched list.</div>`;
+    return `<div class="annotation-empty">No shared traits or contexts were detected for the matched list.</div>`;
   }
   const groups = groupSignalRows(state.annotationEnrichment);
   return `
@@ -3936,7 +4074,7 @@ function renderEnrichmentPanel() {
 
 function researchSignalCard(term) {
   const attrs = term.target_id
-    ? `type="button" data-action="select-global" data-kind="entity" data-id="${esc(term.target_id)}" data-pmcid="${esc(term.target_pmcid || "")}"`
+    ? `type="button" data-action="select-global" data-kind="${esc(term.target_kind || "entity")}" data-id="${esc(term.target_id)}" data-pmcid="${esc(term.target_pmcid || "")}"`
     : "";
   const tag = term.target_id ? "button" : "div";
   return `
@@ -4538,7 +4676,7 @@ function textHasQueryToken(text, query) {
 function computeAnnotationEnrichment() {
   if (!state.globalPathIndex || !state.annotationResults.length) return [];
   const selected = uniqueEntities(state.annotationResults.map((row) => row.matches[0]).filter(Boolean));
-  if (!selected.length) return [];
+  if (selected.length < 2) return [];
   const rows = [];
   const withTraits = [];
   const withContexts = [];
@@ -4546,24 +4684,28 @@ function computeAnnotationEnrichment() {
   selected.forEach((entity) => {
     const relations = (state.globalPathIndexes?.relationsByEntity?.get(entity.id) || []).filter((rel) => relationHasEndpoint(rel, entity.id));
     const traits = annotationTraitRows(entity, relations);
+    const mechanisms = annotationMechanismRows(entity, relations);
     const contexts = annotationContextRows(relations);
-    if (traits.length) withTraits.push(entity);
+    if (traits.length || mechanisms.some((mechanism) => mechanism.kind === "Trait or phenotype")) withTraits.push(entity);
     if (contexts.length) withContexts.push(entity);
     if (annotationDataFlags(entity).length) withMetadata.push(entity);
-    traits.forEach((trait) => {
+    mechanisms
+      .filter((mechanism) => mechanism.kind === "Trait or phenotype" || mechanism.kind === "Regulation" || mechanism.kind === "Metabolism")
+      .forEach((mechanism) => {
       upsertAnnotationSignal(rows, {
-        category: "Trait signals",
-        label: trait.label,
-        count: trait.count,
+        category: "Biology in list",
+        label: mechanism.statement,
+        count: 1,
         unit: "relations",
-        detail: [trait.predicateSummary, trait.contextSummary ? `contexts: ${trait.contextSummary}` : ""].filter(Boolean).join(" | "),
+        detail: mechanism.contextSummary || mechanism.kind,
         entity,
-        target: trait,
+        target: { id: mechanism.id, pmcid: mechanism.pmcid, label: mechanism.statement },
+        targetKind: "relation",
       });
     });
     contexts.forEach((context) => {
       upsertAnnotationSignal(rows, {
-        category: "Context signals",
+        category: "Shared contexts",
         label: context.label,
         count: context.count,
         unit: "relations",
@@ -4575,7 +4717,7 @@ function computeAnnotationEnrichment() {
   });
 
   addSignal(rows, "Coverage", "Matched entities", selected.length, `${fmt(selected.length)} submitted entities matched PSFD records.`, selected);
-  addSignal(rows, "Coverage", "Entities with trait evidence", withTraits.length, `${fmt(withTraits.length)} matched entities have direct trait endpoints.`, withTraits);
+  addSignal(rows, "Coverage", "Entities with trait or mechanism evidence", withTraits.length, `${fmt(withTraits.length)} matched entities have direct relation evidence to traits, regulation, or metabolism.`, withTraits);
   addSignal(rows, "Coverage", "Entities with extracted context", withContexts.length, `${fmt(withContexts.length)} matched entities have relation-specific context.`, withContexts);
   if (withMetadata.length) addSignal(rows, "Metadata", "Entities with external metadata", withMetadata.length, "Sequence, ontology, compound, or classifier metadata is available.", withMetadata);
 
@@ -4610,6 +4752,7 @@ function upsertAnnotationSignal(rows, item) {
       entities: [],
       target_id: item.target?.id || "",
       target_pmcid: item.target?.pmcid || "",
+      target_kind: item.targetKind || "entity",
     };
     rows.push(row);
   }
@@ -4784,10 +4927,11 @@ function exportAnnotationTable() {
     "type",
     "paper",
     "normalized_ids",
+    "ontology_annotation",
     "summary",
     "facts",
     "metadata",
-    "trait_associations",
+    "main_evidence",
     "contexts",
     "match_count",
   ];
@@ -4800,10 +4944,11 @@ function exportAnnotationTable() {
       row.type,
       row.pmcid,
       row.normalized,
+      profile?.ontology ? [profile.ontology.title, profile.ontology.id, profile.ontology.source].filter(Boolean).join(" | ") : "",
       profile?.summary || row.annotation,
       profile ? profile.facts.map((item) => `${item[0]}: ${item[1]}`).join(" | ") : "",
       profile ? profile.metadata.map((item) => `${item[0]}: ${item[1]}`).join(" | ") : "",
-      profile ? profile.traits.map((item) => `${item.label}: ${item.predicateSummary}${item.contextSummary ? ` [${item.contextSummary}]` : ""}`).join(" | ") : "",
+      profile ? profile.mechanisms.map((item) => `${item.statement}${item.contextSummary ? ` [${item.contextSummary}]` : ""}`).join(" | ") : "",
       profile ? profile.contexts.map((item) => `${item.label} (${item.type}; ${item.count})`).join(" | ") : "",
       row.matchCount,
     ];
@@ -5700,9 +5845,16 @@ async function selectGlobalItem(kind, id, pmcid) {
   if (pmcid && pmcid !== state.paper) {
     await loadPaper(pmcid, { preservePath: true });
   }
+  state.query = "";
+  if (els.searchInput) els.searchInput.value = "";
   state.tab = tabByKind[kind] || state.tab;
   selectItem(kind, id, false);
   render();
+  if (typeof requestAnimationFrame === "function") {
+    requestAnimationFrame(() => {
+      els.mainPanel?.scrollIntoView({ block: "start", behavior: "smooth" });
+    });
+  }
 }
 
 function renderInspector() {
