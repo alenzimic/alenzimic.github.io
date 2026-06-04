@@ -1393,10 +1393,10 @@ function renderDependencyMain(dep) {
       <summary>Explore related events and bridges</summary>
       ${dependencyJumpRail(dep)}
     </details>
-    ${disclosureSection("Dependency Evidence And Provenance", `
+    ${disclosureSection("Technical Dependency Provenance", `
       ${dependencyEvidence(dep)}
       ${supportingRelationPairs(dep)}
-    `)}
+    `, "optional")}
   `;
 }
 
@@ -1703,8 +1703,8 @@ function dependencyEvidenceDock(dep) {
   return `
     <section class="dependency-evidence-dock minimal-evidence-dock">
       <div class="dependency-evidence-head">
-        <strong>Why these events are linked</strong>
-        <span>Read the source evidence, the bridge, and the target evidence.</span>
+        <strong>Connection provenance</strong>
+        <span>The source and target claims are shown with the dependency bridge that links them.</span>
       </div>
       ${pairs.length ? dependencyProofCard(dep, pairs[0]) : dependencyFallbackEventEvidence(dep, source, target)}
       ${hiddenPairs ? `<div class="evidence-more-note">${fmt(hiddenPairs)} additional supporting relation pair${hiddenPairs === 1 ? "" : "s"} are available in technical provenance below.</div>` : ""}
@@ -1727,14 +1727,14 @@ function dependencyProofCard(dep, pair) {
   return `
     <article class="dependency-proof-card simple-proof">
       <div class="dependency-proof-flow simple-proof-flow">
-        ${relationProofCard(pair.sourceRel, "Source event text")}
+        ${relationProofCard(pair.sourceRel, "Source text")}
         <div class="dependency-proof-bridge">
-          <span>links through</span>
+          <span>Dependency bridge</span>
           <strong>${esc(clean(dep.dependency_type || "event dependency"))}</strong>
           ${asArray(dep.bridge_entities).length ? `<small>${esc(asArray(dep.bridge_entities).join(", "))}</small>` : ""}
           ${dep.reason_code ? `<small>${esc(clean(dep.reason_code))}</small>` : ""}
         </div>
-        ${relationProofCard(pair.targetRel, "Target event text")}
+        ${relationProofCard(pair.targetRel, "Target text")}
       </div>
     </article>
   `;
@@ -1745,19 +1745,17 @@ function relationProofCard(rel, role) {
   const sentence = relationEvidenceSentence(rel);
   const contexts = relationContextEntities(rel);
   const sentenceId = sentence.id || asArray(rel.evidence_sentence_ids)[0] || "";
-  const sentenceMeta = sentenceMetadataLine(sentenceId);
   return `
     <article class="proof-relation-card text-first-card">
       <div class="proof-relation-head">
-        <span>${esc(role)}</span>
+        <div>
+          <span>${esc(role)}</span>
+          <small>${esc(sentenceId || rel.record_id)}</small>
+        </div>
         <button class="mini-button subtle-open" type="button" data-action="select-relation" data-id="${esc(rel.record_id)}">Open</button>
       </div>
       <p class="proof-evidence-text">${sentence.text ? highlightRelationSentence(sentence.text, rel, contexts) : `<span class="muted">No evidence text found for this relation.</span>`}</p>
-      <div class="proof-triple-cue">${relationPlainTriple(rel)}</div>
-      <div class="proof-foot">
-        ${sentenceMeta ? `<div class="proof-sentence-meta compact-meta">${sentenceMeta}</div>` : ""}
-        ${contexts.length ? `<div class="proof-context-line"><span>context</span>${contexts.map(relationContextEntityChip).join("")}</div>` : ""}
-      </div>
+      <button class="proof-triple-cue compact-triple-cue" type="button" data-action="select-relation" data-id="${esc(rel.record_id)}">${relationPlainTriple(rel)}</button>
     </article>
   `;
 }
@@ -1802,7 +1800,7 @@ function eventEvidenceProofCard(event, role) {
       <strong>${esc(event.event_label || event.event_id)}</strong>
       ${sentenceIds.length ? sentenceIds.map((id) => {
         const sentence = state.indexes.sentenceById.get(id);
-        return `<p>${sentenceMetadataLine(id)}${sentence?.text ? `<br>${esc(sentence.text)}` : ""}</p>`;
+        return `<p>${sentence?.text ? esc(sentence.text) : esc(id)}</p>`;
       }).join("") : `<p class="muted">No evidence sentence IDs.</p>`}
     </article>
   `;
@@ -2592,7 +2590,6 @@ function renderEventMain(event) {
         <div>${badges([event.has_accepted_dependency ? "connected" : "no accepted dependency", event.event_scope])}</div>
       </div>
     </section>
-    ${eventProvenanceMap(event, relations)}
     <section class="hero-card event-mechanism-details">
       ${eventConstellation(event)}
       <div class="two-col">
@@ -2611,6 +2608,7 @@ function renderEventMain(event) {
         </div>
       </div>
     </section>
+    ${eventProvenanceMap(event, relations)}
     ${disclosureSection("Relation Hyperedges In This Event", `
       <div class="relation-list">${relations.map((rel) => relationContextRow(rel, { eventId: event.event_id, activeId: focused?.record_id || "" })).join("") || `<div class="compact-card muted">No relations.</div>`}</div>
     `, fmt(relations.length))}
@@ -2627,8 +2625,8 @@ function eventProvenanceMap(event, relations) {
     <section class="section-card event-provenance-panel simple-event-evidence">
       <div class="section-header">
         <div>
-          <h2>Event Evidence</h2>
-          <span class="muted">Each card is one evidence sentence; highlighted terms show the extracted triples.</span>
+          <h2>Evidence text</h2>
+          <span class="muted">Sentences supporting this event. Select a triple pill to inspect its context.</span>
         </div>
         <span class="muted">${fmt(groups.length)} sentence${groups.length === 1 ? "" : "s"}</span>
       </div>
@@ -2669,14 +2667,15 @@ function eventProvenanceCard(group, event) {
     <article class="event-provenance-card simple-event-card">
       <div class="event-provenance-head">
         <div>
-          <strong>${group.relations.length > 1 ? "Shared evidence sentence" : "Evidence sentence"}</strong>
-          <span>${esc(group.relations.length)} extracted triple${group.relations.length === 1 ? "" : "s"}</span>
+          <strong>Evidence sentence</strong>
+          <span>${esc(group.relations.length)} triple${group.relations.length === 1 ? "" : "s"}</span>
         </div>
-        ${meta ? `<div class="proof-sentence-meta">${meta}</div>` : ""}
+        ${meta ? `<div class="event-sentence-meta">${meta}</div>` : ""}
       </div>
       <p>${evidenceText ? highlightTextRanges(evidenceText, terms) : `<span class="muted">No evidence text found for this provenance group.</span>`}</p>
       <div class="event-triple-chips">
-        ${group.relations.map((rel) => eventTripleChip(rel, event.event_id)).join("")}
+        ${group.relations.slice(0, 4).map((rel) => eventTripleChip(rel, event.event_id)).join("")}
+        ${group.relations.length > 4 ? `<span class="event-more-chip">+${fmt(group.relations.length - 4)} more</span>` : ""}
       </div>
     </article>
   `;
