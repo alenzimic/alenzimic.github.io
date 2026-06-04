@@ -3837,12 +3837,13 @@ function renderDiscoverWorkbench() {
               <small>One query per line</small>
             </div>
           </div>
-          <textarea id="annotationInput" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Solyc01g102960.3.1&#10;PTI&#10;piperonylic acid&#10;CHEBI:107644">${esc(state.annotationInput)}</textarea>
+          <textarea id="annotationInput" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Solyc09g014280&#10;StWRKY65&#10;phenylpropanoid pathway&#10;piperonylic acid">${esc(state.annotationInput)}</textarea>
           <div class="annotation-examples">
-            ${annotationExampleButton("Tomato gene", "Solyc01g102960.3.1")}
-            ${annotationExampleButton("Immune pathway", "PTI")}
-            ${annotationExampleButton("Compound", "piperonylic acid")}
-            ${annotationExampleButton("Mixed list", "Solyc01g102960.3.1\nPTI\npiperonylic acid")}
+            ${annotationExampleButton("Tomato ASAT gene", "Solyc09g014280")}
+            ${annotationExampleButton("Potato WRKY gene", "StWRKY65")}
+            ${annotationExampleButton("Immune pathways", "pathogen-associated molecular pattern receptor signaling pathway\nphenylpropanoid biosynthesis\nplant-type hypersensitive response")}
+            ${annotationExampleButton("Compounds", "piperonylic acid\nGABA\nABA")}
+            ${annotationExampleButton("Mixed list", "Solyc09g014280\nStWRKY65\nphenylpropanoid pathway\npiperonylic acid\nthermotolerance")}
           </div>
           <div class="annotation-actions">
             <button class="mini-button primary-action" type="button" data-annotation-action="annotate">Annotate</button>
