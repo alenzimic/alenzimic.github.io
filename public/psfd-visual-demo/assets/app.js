@@ -1384,6 +1384,7 @@ function renderDependencyMain(dep) {
         <div>
           <h2>${esc(state.data.pmcid)} dependency ${esc(shortId(dep.dependency_id))}</h2>
           <p>Read the biological claim from source event, through the dependency bridge, into the target event.</p>
+          ${dependencyProvenancePills(dep)}
         </div>
         <div>${badges([dep.tier], dep.tier)} ${badges([clean(dep.dependency_type)])}</div>
       </div>
@@ -1754,6 +1755,7 @@ function relationProofCard(rel, role) {
         </div>
         <button class="mini-button subtle-open" type="button" data-action="select-relation" data-id="${esc(rel.record_id)}">Open</button>
       </div>
+      ${relationProvenancePills(rel, { compact: true })}
       <p class="proof-evidence-text">${sentence.text ? highlightRelationSentence(sentence.text, rel, contexts) : `<span class="muted">No evidence text found for this relation.</span>`}</p>
       <button class="proof-triple-cue compact-triple-cue" type="button" data-action="select-relation" data-id="${esc(rel.record_id)}">${relationPlainTriple(rel)}</button>
     </article>
@@ -1778,6 +1780,109 @@ function sentenceMetadataLine(sentenceId) {
     sentenceId
   ].filter(Boolean);
   return items.map((item) => `<span>${esc(item)}</span>`).join("");
+}
+
+function cleanSectionName(value) {
+  const text = String(value || "").replaceAll("_", " ").trim();
+  if (!text) return "";
+  return text.toLowerCase().replace(/\b[a-z]/g, (letter) => letter.toUpperCase());
+}
+
+function sentenceSections(sentenceIds) {
+  return uniqueStrings(asArray(sentenceIds).map((id) => {
+    const sentence = state.indexes?.sentenceById.get(id);
+    return cleanSectionName(sentence?.section || "");
+  }).filter(Boolean));
+}
+
+function relationEvidenceSections(rel) {
+  return uniqueStrings([
+    ...sentenceSections(rel?.evidence_sentence_ids),
+    ...asArray(rel?.evidence).map((item) => cleanSectionName(item?.section_type || "")).filter(Boolean)
+  ]);
+}
+
+function relationEvidenceMode(rel) {
+  const value = rel?.assertion_modifier || rel?.relation_evaluation_verdict || rel?.record_type || "";
+  return value ? clean(value).trim() : "";
+}
+
+function eventEvidenceSections(event, relations = null) {
+  const eventRelations = relations || (state.indexes?.relationsByEvent.get(event?.event_id) || []);
+  return uniqueStrings([
+    ...sentenceSections(event?.evidence_sentence_ids),
+    ...eventRelations.flatMap(relationEvidenceSections)
+  ]);
+}
+
+function eventEvidenceModes(relations) {
+  const counts = new Map();
+  relations.forEach((rel) => {
+    const mode = relationEvidenceMode(rel);
+    if (!mode) return;
+    counts.set(mode, (counts.get(mode) || 0) + 1);
+  });
+  return Array.from(counts.entries())
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([mode, count]) => `${mode} ${count}`);
+}
+
+function dependencyEvidenceSections(dep) {
+  const relations = dependencySupportingRelationPairs(dep).flatMap((pair) => [pair.sourceRel, pair.targetRel]).filter(Boolean);
+  const sourceEvent = state.indexes?.eventById.get(dep?.upstream_event_id);
+  const targetEvent = state.indexes?.eventById.get(dep?.downstream_event_id);
+  return uniqueStrings([
+    ...sentenceSections(dep?.evidence_sentence_ids),
+    ...relations.flatMap(relationEvidenceSections),
+    ...(sourceEvent ? eventEvidenceSections(sourceEvent) : []),
+    ...(targetEvent ? eventEvidenceSections(targetEvent) : [])
+  ]);
+}
+
+function dependencyEvidenceModes(dep) {
+  const relations = dependencySupportingRelationPairs(dep).flatMap((pair) => [pair.sourceRel, pair.targetRel]).filter(Boolean);
+  return eventEvidenceModes(relations);
+}
+
+function provenancePillGroup(items, label, options = {}) {
+  const values = uniqueStrings(asArray(items).filter(Boolean));
+  if (!values.length) return "";
+  const limit = options.limit || 3;
+  const shown = values.slice(0, limit);
+  return `
+    <div class="provenance-pill-group ${options.compact ? "compact" : ""}">
+      <span class="provenance-label">${esc(label)}</span>
+      ${shown.map((value) => `<span class="provenance-pill">${esc(value)}</span>`).join("")}
+      ${values.length > limit ? `<span class="provenance-pill muted-pill">+${fmt(values.length - limit)}</span>` : ""}
+    </div>
+  `;
+}
+
+function relationProvenancePills(rel, options = {}) {
+  return `
+    <div class="claim-provenance ${options.compact ? "compact" : ""}">
+      ${provenancePillGroup(relationEvidenceSections(rel), "section", { compact: options.compact, limit: options.compact ? 1 : 3 })}
+      ${provenancePillGroup([relationEvidenceMode(rel)], "mode", { compact: options.compact, limit: 1 })}
+    </div>
+  `;
+}
+
+function eventProvenancePills(event, relations, options = {}) {
+  return `
+    <div class="claim-provenance ${options.compact ? "compact" : ""}">
+      ${provenancePillGroup(eventEvidenceSections(event, relations), "section", { compact: options.compact, limit: options.compact ? 1 : 3 })}
+      ${provenancePillGroup(eventEvidenceModes(relations), "relations", { compact: options.compact, limit: options.compact ? 1 : 3 })}
+    </div>
+  `;
+}
+
+function dependencyProvenancePills(dep, options = {}) {
+  return `
+    <div class="claim-provenance ${options.compact ? "compact" : ""}">
+      ${provenancePillGroup(dependencyEvidenceSections(dep), "section", { compact: options.compact, limit: options.compact ? 1 : 3 })}
+      ${provenancePillGroup([dep?.support_verdict || dep?.verdict, ...dependencyEvidenceModes(dep)], "support", { compact: options.compact, limit: options.compact ? 1 : 3 })}
+    </div>
+  `;
 }
 
 function dependencyFallbackEventEvidence(dep, source, target) {
@@ -1821,6 +1926,7 @@ function eventMechanismPanel(event, role) {
       <div class="mechanism-meta">
         ${badges([clean(event.event_type), `${event.relation_count} relations`, `${event.dependency_counts.accepted} deps`])}
       </div>
+      ${eventProvenancePills(event, state.indexes.relationsByEvent.get(event.event_id) || [], { compact: true })}
       <div class="mechanism-section participants-section">
         <div class="mechanism-section-head">
           <span class="section-index">01</span>
@@ -1855,6 +1961,7 @@ function dependencyBridgePanel(dep, color) {
         <span class="bridge-eyebrow">Dependency link</span>
         <strong>${esc(clean(dep.dependency_type))}</strong>
         <span class="bridge-tier">${esc(dep.tier)}${dep.confidence ? ` | confidence ${esc(dep.confidence)}` : ""}</span>
+        ${dependencyProvenancePills(dep, { compact: true })}
         <div class="bridge-facts">
           <div>
             <span>Bridge</span>
@@ -2134,6 +2241,7 @@ function relationContextRow(rel, options = {}) {
           <strong>${esc(shortText(clean(rel.predicate || rel.predicate_class || "relates to"), 28))}</strong>
           <span>${esc(shortText(objectLabel, 26))}</span>
         </button>
+        ${relationProvenancePills(rel, { compact: true })}
         <div class="compact-relation-meta">
           <div class="compact-context-strip">
             ${compactContexts.length ? `<span class="context-strip-label">context</span>${compactContexts.map(relationContextEntityChip).join("")}` : ""}
@@ -2151,6 +2259,7 @@ function relationContextRow(rel, options = {}) {
         <strong>${esc(shortText(clean(rel.predicate || rel.predicate_class || "relates to"), options.compact ? 24 : 36))}</strong>
         <span>${esc(shortText(objectLabel, options.compact ? 22 : 34))}</span>
       </button>
+      ${relationProvenancePills(rel, { compact: true })}
       <div class="relation-context-assignment">
         <span class="assignment-label">context</span>
         ${visibleContexts.length ? visibleContexts.map(relationContextEntityChip).join("") : `<span class="muted tiny">no context entities</span>`}
@@ -2537,6 +2646,8 @@ function dependencyEvidence(dep) {
       <div class="kv">
         <div class="key">Dependency ID</div><div>${esc(dep.dependency_id)}</div>
         <div class="key">Verdict</div><div>${badges([dep.tier], dep.tier)} ${esc(dep.support_verdict || "")}</div>
+        <div class="key">Evidence sections</div><div>${provenancePillGroup(dependencyEvidenceSections(dep), "section") || `<span class="muted">-</span>`}</div>
+        <div class="key">Support basis</div><div>${provenancePillGroup([dep.support_verdict || dep.verdict, ...dependencyEvidenceModes(dep)], "support") || `<span class="muted">-</span>`}</div>
         <div class="key">Origin</div><div>${esc(dep.dependency_origin || "-")}</div>
         <div class="key">Candidates</div><div>${badges([...asArray(dep.candidate_dependency_ids), ...asArray(dep.origin_candidate_dependency_ids)], "", 10)}</div>
       </div>
@@ -2586,6 +2697,7 @@ function renderEventMain(event) {
         <div>
           <h2>${esc(event.event_label || event.event_id)}</h2>
           <p>${esc(event.event_id)} | ${esc(clean(event.event_type))}</p>
+          ${eventProvenancePills(event, relations)}
         </div>
         <div>${badges([event.has_accepted_dependency ? "connected" : "no accepted dependency", event.event_scope])}</div>
       </div>
@@ -2599,6 +2711,8 @@ function renderEventMain(event) {
           <div class="key">Review deps</div><div>${fmt(event.dependency_counts.review)}</div>
           <div class="key">Confidence</div><div>${esc(event.confidence || "-")}</div>
           <div class="key">Reason</div><div>${esc(event.reason_code || "-")}</div>
+          <div class="key">Evidence sections</div><div>${provenancePillGroup(eventEvidenceSections(event, relations), "section") || `<span class="muted">-</span>`}</div>
+          <div class="key">Relation modes</div><div>${provenancePillGroup(eventEvidenceModes(relations), "mode") || `<span class="muted">-</span>`}</div>
           <div class="key">Evidence</div><div>${badges(event.evidence_sentence_ids, "", 10)}</div>
         </div>
         <div class="evidence-block">
@@ -2719,6 +2833,7 @@ function renderRelationMain(rel) {
         <div>
           <h2>${esc(rel.triple || rel.record_id)}</h2>
           <p>${esc(rel.record_id)} | ${esc(clean(rel.predicate_class))}</p>
+          ${relationProvenancePills(rel)}
         </div>
         <div>${badges([rel.merge_decision, rel.record_type].filter(Boolean))}</div>
       </div>
@@ -2745,6 +2860,9 @@ function relationEvidence(rel) {
       <div class="kv">
         <div class="key">Source relation</div><div>${esc(rel.source_relation_id || "-")}</div>
         <div class="key">Passage</div><div>${esc(rel.current_passage_id || "-")}</div>
+        <div class="key">Evidence section</div><div>${provenancePillGroup(relationEvidenceSections(rel), "section") || `<span class="muted">-</span>`}</div>
+        <div class="key">Assertion mode</div><div>${provenancePillGroup([relationEvidenceMode(rel)], "mode") || `<span class="muted">-</span>`}</div>
+        <div class="key">Evaluation</div><div>${badges([rel.relation_evaluation_verdict, rel.relation_evaluation_status].filter(Boolean))}</div>
         <div class="key">Context source</div><div>${esc(rel.context_enrichment_source || "-")}</div>
         <div class="key">Context enriched</div><div>${esc(String(rel.context_enriched))}</div>
         <div class="key">Sentence-local context</div><div>${localContexts.length ? localContexts.map(relationContextEntityChip).join("") : `<span class="muted">No context matched the relation evidence sentence.</span>`}</div>

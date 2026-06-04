@@ -1680,7 +1680,7 @@ textarea {
 
 .relation-context-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(180px, 0.8fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(112px, 0.28fr) minmax(180px, 0.8fr) auto;
   gap: 8px;
   align-items: start;
   padding: 8px;
@@ -1696,6 +1696,71 @@ textarea {
   padding: 6px;
   border-color: #d9e4df;
   background: #fff;
+}
+
+.claim-provenance {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+  margin-top: 7px;
+}
+
+.claim-provenance.compact {
+  margin-top: 2px;
+  gap: 4px;
+}
+
+.provenance-pill-group {
+  min-width: 0;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.provenance-pill-group.compact {
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+
+.provenance-label {
+  color: #758781;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .02em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.provenance-pill {
+  max-width: 180px;
+  min-height: 18px;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border: 1px solid #d2e2dd;
+  border-radius: 999px;
+  background: #f3f8f6;
+  color: #40544d;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.claim-provenance.compact .provenance-pill {
+  max-width: 104px;
+  min-height: 17px;
+  padding: 1px 6px;
+  font-size: 9px;
+}
+
+.provenance-pill.muted-pill {
+  background: #eef3f1;
+  color: #71817b;
 }
 
 .relation-context-row.active {
